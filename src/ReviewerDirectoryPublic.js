@@ -641,7 +641,7 @@ export default function ReviewerDirectoryPublic() {
         <Divider />
         <Box sx={{ px: 2, py: 1.25, display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
           <Typography variant="caption" color="text.secondary">
-            Information updates live and reflects available reviewers only. Public directory contains no PHI.
+            Information updates live and reflects available reviewers only. Panel directory contains no PHI.
           </Typography>
           <Box sx={{ ml: "auto" }} />
           <Typography variant="caption" color="text.secondary">
