@@ -1,47 +1,84 @@
 // src/ReviewerDirectoryPublic.js
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Box, Paper, Typography, TextField, InputAdornment,
-  Table, TableHead, TableBody, TableRow, TableCell, TableContainer, TableSortLabel,
-  Chip, CircularProgress, Alert, Autocomplete, Stack, Divider, Tooltip
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  InputAdornment,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableContainer,
+  TableSortLabel,
+  Chip,
+  CircularProgress,
+  Alert,
+  Autocomplete,
+  Divider,
+  Tooltip,
+  IconButton,
+  Snackbar,
+  Slide,
 } from "@mui/material";
-import { Search as SearchIcon, Circle as LiveDot } from "@mui/icons-material";
+import { Search as SearchIcon, Circle as LiveDot, MapRounded as MapIcon } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { supabase } from "./supabaseClient.js";
+import USReviewerDirectoryDrawer from "./USReviewerDirectoryDrawer.js";
 
-const TABLE_NAME = "reviewers";
+const TABLE_NAME = "public_reviewer_directory";
 const STATUS_URL = process.env.REACT_APP_STATUS_URL || null;
 
-/* ========= Specialty synonyms (lowercase) ========= */
+const AUTH_KEY = "pl_dir_auth";
+const AUTH_TTL_MS = 12 * 60 * 60 * 1000; // 12h
+
+function readAuthMeta() {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (!raw) return { ok: false, t: 0 };
+    const parsed = JSON.parse(raw);
+    const t = Number(parsed?.t || 0);
+    const ok = Date.now() - t < AUTH_TTL_MS;
+    return { ok, t };
+  } catch {
+    return { ok: false, t: 0 };
+  }
+}
+function isAuthedNow() {
+  return readAuthMeta().ok;
+}
+
 const SPEC_SYNONYMS = (() => {
   const map = {};
   const add = (arr) => {
     const set = new Set(arr.map((s) => s.toLowerCase()));
     for (const s of set) map[s] = new Set(set);
   };
-  add(["cardiology","cardiovascular disease","interventional cardiology","cardiovascular medicine"]);
-  add(["pulmonology","pulmonary medicine","pulmonary","pulmonary/critical care","pccm"]);
-  add(["otolaryngology","ent","ear nose throat"]);
-  add(["gastroenterology","gi","digestive diseases"]);
-  add(["nephrology","renal medicine","kidney disease"]);
-  add(["endocrinology","endocrinology, diabetes & metabolism","diabetes & metabolism"]);
-  add(["hematology/oncology","heme/onc","oncology","medical oncology","hematology"]);
-  add(["pm&r","physical medicine & rehabilitation","physical medicine and rehabilitation","physiatry"]);
-  add(["ob/gyn","obstetrics and gynecology","obstetrics & gynecology","gynecology","obstetrics"]);
-  add(["orthopedic surgery","orthopedics","orthopaedics","orthopaedic surgery"]);
-  add(["family medicine","family practice"]);
-  add(["internal medicine","internist"]);
-  add(["emergency medicine","er"]);
-  add(["general surgery","surgery"]);
-  add(["pediatrics","peds"]);
-  add(["dermatology","derm"]);
-  add(["rheumatology","rheum"]);
-  add(["infectious disease","id"]);
-  add(["anesthesiology","anesthesia"]);
-  add(["pain medicine","pain management"]);
-  add(["neurology","neuro"]);
-  add(["psychiatry","psych"]);
-  add(["psychology","clinical psychology","behavioral health"]);
+  add(["cardiology", "cardiovascular disease", "interventional cardiology", "cardiovascular medicine"]);
+  add(["pulmonology", "pulmonary medicine", "pulmonary", "pulmonary/critical care", "pccm"]);
+  add(["otolaryngology", "ent", "ear nose throat"]);
+  add(["gastroenterology", "gi", "digestive diseases"]);
+  add(["nephrology", "renal medicine", "kidney disease"]);
+  add(["endocrinology", "endocrinology, diabetes & metabolism", "diabetes & metabolism"]);
+  add(["hematology/oncology", "heme/onc", "oncology", "medical oncology", "hematology"]);
+  add(["pm&r", "physical medicine & rehabilitation", "physical medicine and rehabilitation", "physiatry"]);
+  add(["ob/gyn", "obstetrics and gynecology", "obstetrics & gynecology", "gynecology", "obstetrics"]);
+  add(["orthopedic surgery", "orthopedics", "orthopaedics", "orthopaedic surgery"]);
+  add(["family medicine", "family practice"]);
+  add(["internal medicine", "internist"]);
+  add(["emergency medicine", "er"]);
+  add(["general surgery", "surgery"]);
+  add(["pediatrics", "peds"]);
+  add(["dermatology", "derm"]);
+  add(["rheumatology", "rheum"]);
+  add(["infectious disease", "id"]);
+  add(["anesthesiology", "anesthesia"]);
+  add(["pain medicine", "pain management"]);
+  add(["neurology", "neuro"]);
+  add(["psychiatry", "psych"]);
+  add(["psychology", "clinical psychology", "behavioral health"]);
   return map;
 })();
 
@@ -55,6 +92,7 @@ function expandSpecialtySynonyms(spec) {
   }
   return new Set([s]);
 }
+
 function buildSpecialtyIndex(specs) {
   const out = new Set();
   for (const sp of specs || []) {
@@ -65,17 +103,23 @@ function buildSpecialtyIndex(specs) {
   return out;
 }
 
-/* ========= UI utils ========= */
 const specialtyColors = [
-  "#1976d2","#388e3c","#fbc02d","#7b1fa2",
-  "#d32f2f","#0097a7","#8d6e63","#c2185b",
-  "#0288d1","#43a047","#ffa000","#6d4c41",
-  "#512da8","#455a64",
+  "#1976d2",
+  "#388e3c",
+  "#fbc02d",
+  "#7b1fa2",
+  "#d32f2f",
+  "#0097a7",
+  "#8d6e63",
+  "#c2185b",
+  "#0288d1",
+  "#43a047",
+  "#ffa000",
+  "#6d4c41",
+  "#512da8",
+  "#455a64",
 ];
-const specialtyColorsHC = [
-  "#0ea5e9","#10b981","#f59e0b","#ef4444","#8b5cf6","#14b8a6",
-  "#f97316","#22c55e","#e11d48","#3b82f6","#a855f7","#06b6d4",
-];
+const specialtyColorsHC = ["#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6", "#f97316", "#22c55e"];
 
 function colorForSpecialty(s, highContrast = false) {
   if (!s) return "#777";
@@ -87,6 +131,7 @@ function colorForSpecialty(s, highContrast = false) {
 }
 
 const toStr = (v) => (v ?? "").toString().trim();
+
 const splitNameAndCred = (full) => {
   const n = toStr(full);
   if (!n) return { base: "", cred: "" };
@@ -94,6 +139,7 @@ const splitNameAndCred = (full) => {
   if (parts.length === 1) return { base: n.trim(), cred: "" };
   return { base: parts[0].trim(), cred: parts.slice(1).join(",").trim() };
 };
+
 const toLastFirst = (base) => {
   const parts = base.split(/\s+/).filter(Boolean);
   if (parts.length <= 1) return base;
@@ -101,16 +147,19 @@ const toLastFirst = (base) => {
   const firstMid = parts.slice(0, -1).join(" ");
   return `${last}, ${firstMid}`;
 };
+
 const formatDisplayName = (full) => {
   const { base, cred } = splitNameAndCred(full);
   const styled = toLastFirst(base);
   return cred ? `${styled}, ${cred}` : styled;
 };
+
 const lastNameKey = (full) => {
   const { base } = splitNameAndCred(full);
   const parts = base.split(/\s+/).filter(Boolean);
   return (parts[parts.length - 1] || "").toLowerCase();
 };
+
 const asArray = (x) => {
   if (Array.isArray(x)) return x.filter(Boolean);
   if (x == null) return [];
@@ -118,11 +167,17 @@ const asArray = (x) => {
     try {
       const j = JSON.parse(x);
       if (Array.isArray(j)) return j.filter(Boolean);
-    } catch {}
-    return String(x).split(",").map((s) => s.trim()).filter(Boolean);
+    } catch {
+      // ignore
+    }
+    return String(x)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   return [];
 };
+
 const stableRowKey = (r, idx) => {
   const id = r.id != null ? `id:${r.id}` : "";
   const name = toStr(r.name).toLowerCase();
@@ -143,22 +198,19 @@ function contrastText(hex) {
   }
 }
 
-function formatCT(d) {
+function formatLocalTime(d) {
   try {
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat(undefined, {
       hour: "numeric",
       minute: "2-digit",
-      timeZone: "America/Chicago",
     }).format(d);
   } catch {
-    return d.toLocaleTimeString();
+    return d?.toLocaleTimeString?.() || "";
   }
 }
 
-/* ========= Component ========= */
 export default function ReviewerDirectoryPublic() {
   const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
 
   const [density, setDensity] = useState("comfortable");
   const [highContrast, setHighContrast] = useState(false);
@@ -178,8 +230,61 @@ export default function ReviewerDirectoryPublic() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [status, setStatus] = useState({ label: "Unknown", color: "default", uptime: null });
 
+  // Auth state
+  const [authed, setAuthed] = useState(() => isAuthedNow());
+
+  // Coverage Map drawer
+  const [mapOpen, setMapOpen] = useState(false);
+
+  // Notes inline editing
+  const [notesDraft, setNotesDraft] = useState({});
+  const [notesSaving, setNotesSaving] = useState({});
+  const [notesError, setNotesError] = useState({});
+  const [notesEditing, setNotesEditing] = useState(null);
+
+  // Snackbar refresh indicator (no layout shift)
+  const [refreshSnack, setRefreshSnack] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const snackHideTimer = useRef(null);
+
   const debounceTimer = useRef(null);
   const statusTimer = useRef(null);
+  const refreshTimer = useRef(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      try {
+        clearInterval(statusTimer.current);
+      } catch {}
+      try {
+        clearInterval(refreshTimer.current);
+      } catch {}
+      try {
+        clearTimeout(debounceTimer.current);
+      } catch {}
+      try {
+        clearTimeout(snackHideTimer.current);
+      } catch {}
+    };
+  }, []);
+
+  // Keep authed in sync if localStorage changes (login in another tab, logout, etc.)
+  useEffect(() => {
+    const sync = () => setAuthed(isAuthedNow());
+    const onStorage = (e) => {
+      if (!e || e.key === AUTH_KEY) sync();
+    };
+    window.addEventListener("storage", onStorage);
+
+    const t = setInterval(sync, 30000);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      clearInterval(t);
+    };
+  }, []);
 
   useEffect(() => {
     const onDensity = (e) => setDensity(e.detail?.density || "comfortable");
@@ -198,51 +303,122 @@ export default function ReviewerDirectoryPublic() {
     return () => clearTimeout(debounceTimer.current);
   }, [search]);
 
-  const fetchData = async () => {
+  const normalizeRows = useCallback((data) => {
+    const arr = Array.isArray(data) ? data : [];
+    return arr
+      .filter((r) => asArray(r.states).length > 0)
+      .map((r) => {
+        const specs = Array.from(new Set(asArray(r.specialties))).sort((a, b) => a.localeCompare(b));
+        const states = Array.from(new Set(asArray(r.states).map((s) => String(s).toUpperCase()))).sort();
+        const dnu = Array.from(new Set(asArray(r.dnu))).sort((a, b) => a.localeCompare(b));
+        const wc = Array.from(new Set(asArray(r.wc_state_jurisdiction).map((s) => String(s).toUpperCase()))).sort();
+        const specIndex = buildSpecialtyIndex(specs);
+        return {
+          id: r.id,
+          name: r.name || "",
+          specialties: specs,
+          states,
+          dnu,
+          wc_state_jurisdiction: wc,
+          notes: r.notes ?? "",
+          availability: r.availability ?? "Available",
+          _specIndex: specIndex,
+        };
+      });
+  }, []);
+
+  const showRefreshingSnack = useCallback(() => {
+    if (!mountedRef.current) return;
+    if (!hasLoadedOnce) return; // do not show on first load
+    if (err) return; // don't stack with error state
+    setRefreshSnack(true);
+    try {
+      clearTimeout(snackHideTimer.current);
+    } catch {}
+    snackHideTimer.current = setTimeout(() => {
+      if (mountedRef.current) setRefreshSnack(false);
+    }, 900);
+  }, [hasLoadedOnce, err]);
+
+  const fetchData = useCallback(async () => {
     setErr("");
     setLoading(true);
+    showRefreshingSnack();
+
     try {
       const { data, error } = await supabase
         .from(TABLE_NAME)
-        .select("id,name,specialties,states,availability")
+        .select("id,name,specialties,states,dnu,wc_state_jurisdiction,notes,availability")
         .order("name", { ascending: true });
+
+      // eslint-disable-next-line no-console
+      console.log("DIRECTORY FETCH", {
+        url: process.env.REACT_APP_SUPABASE_URL,
+        table: TABLE_NAME,
+        gotRows: Array.isArray(data) ? data.length : null,
+        error: error?.message || null,
+        sample: Array.isArray(data) && data.length ? data[0] : null,
+      });
 
       if (error) throw error;
 
-      const normalized = (Array.isArray(data) ? data : [])
-        .filter((r) => String(r.availability || "").toLowerCase() === "available")
-        .filter((r) => asArray(r.states).length > 0)
-        .map((r) => {
-          const specs = Array.from(new Set(asArray(r.specialties))).sort((a, b) => a.localeCompare(b));
-          const states = Array.from(new Set(asArray(r.states).map((s) => s.toUpperCase()))).sort();
-          const specIndex = buildSpecialtyIndex(specs);
-          return { id: r.id, name: r.name || "", specialties: specs, states, _specIndex: specIndex };
-        });
+      const normalized = normalizeRows(data);
 
+      if (!mountedRef.current) return;
       setRows(normalized);
-      setLastUpdated(new Date()); // only set on successful fetch
+      setLastUpdated(new Date());
+      setHasLoadedOnce(true);
+
+      // seed drafts but do not clobber active edit
+      setNotesDraft((prev) => {
+        const next = { ...prev };
+        for (const r of normalized) {
+          if (notesEditing === r.id) continue;
+          next[r.id] = r.notes ?? "";
+        }
+        return next;
+      });
+
+      if (!normalized.length) {
+        setErr(
+          "Supabase returned 0 rows. This is almost always RLS enabled with no anon SELECT policy (or SELECT privilege missing). Fix RLS/policy on public.public_reviewer_directory."
+        );
+      }
     } catch (e) {
-      setErr(e.message || String(e));
+      if (!mountedRef.current) return;
+      setErr(e?.message || String(e));
     } finally {
+      if (!mountedRef.current) return;
       setLoading(false);
     }
-  };
-
-  useEffect(() => { fetchData(); }, []);
+  }, [normalizeRows, notesEditing, showRefreshingSnack]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel("reviewers_public_live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "reviewers" }, () => {
-        fetchData();
-        // lastUpdated will be set inside fetchData on success
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+    fetchData();
+  }, [fetchData]);
+
+  // Refresh directory every 15 minutes (+ when tab becomes visible)
+  useEffect(() => {
+    refreshTimer.current = setInterval(() => {
+      fetchData();
+    }, 15 * 60 * 1000);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchData();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      try {
+        clearInterval(refreshTimer.current);
+      } catch {}
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [fetchData]);
 
   useEffect(() => {
     if (!STATUS_URL) return;
+
     const poll = async () => {
       try {
         const res = await fetch(STATUS_URL, { cache: "no-store" });
@@ -255,19 +431,14 @@ export default function ReviewerDirectoryPublic() {
         setStatus({ label: "Status Unavailable", color: "default", uptime: null });
       }
     };
+
     poll();
     statusTimer.current = setInterval(poll, 60000);
     return () => clearInterval(statusTimer.current);
   }, []);
 
-  const allSpecialties = useMemo(
-    () => Array.from(new Set(rows.flatMap((r) => r.specialties || []))).sort(),
-    [rows]
-  );
-  const allStates = useMemo(
-    () => Array.from(new Set(rows.flatMap((r) => r.states || []))).sort(),
-    [rows]
-  );
+  const allSpecialties = useMemo(() => Array.from(new Set(rows.flatMap((r) => r.specialties || []))).sort(), [rows]);
+  const allStates = useMemo(() => Array.from(new Set(rows.flatMap((r) => r.states || []))).sort(), [rows]);
 
   const toggleSpec = (s) => setSelSpecs((cs) => (cs.includes(s) ? cs.filter((x) => x !== s) : [...cs, s]));
   const toggleState = (st) => setSelStates((cs) => (cs.includes(st) ? cs.filter((x) => x !== st) : [...cs, st]));
@@ -281,35 +452,45 @@ export default function ReviewerDirectoryPublic() {
 
   const rowsWithHay = useMemo(() => {
     return rows.map((r) => {
-      const name = r.name.toLowerCase();
+      const name = String(r.name || "").toLowerCase();
       const states = (r.states || []).map((x) => String(x).toLowerCase());
       const specs = (r.specialties || []).map((x) => String(x).toLowerCase());
       const syns = Array.from(r._specIndex || []);
-      const hay = [name, ...states, ...specs, ...syns].join(" ");
+      const dnu = (r.dnu || []).map((x) => String(x).toLowerCase());
+      const wc = (r.wc_state_jurisdiction || []).map((x) => String(x).toLowerCase());
+      const notes = String(r.notes || "").toLowerCase();
+      const hay = [name, ...states, ...specs, ...syns, ...dnu, ...wc, notes].join(" ");
       return { ...r, _hay: hay };
     });
   }, [rows]);
 
   const filtered = useMemo(() => {
     const terms = debouncedSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return rowsWithHay.filter((r) => {
-      if (selSpecs.length && !selSpecs.every((s) => rowHasSpecialty(r, s))) return false;
-      if (selStates.length && !selStates.every((s) => (r.states || []).includes(s))) return false;
-      if (!terms.length) return true;
-      return terms.every((t) => r._hay.includes(t));
-    });
+
+    return rowsWithHay
+      .filter((r) => String(r.availability || "Available") !== "Unavailable")
+      .filter((r) => {
+        if (selSpecs.length && !selSpecs.every((s) => rowHasSpecialty(r, s))) return false;
+        if (selStates.length && !selStates.every((s) => (r.states || []).includes(s))) return false;
+        if (!terms.length) return true;
+        return terms.every((t) => r._hay.includes(t));
+      });
   }, [rowsWithHay, debouncedSearch, selSpecs, selStates]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
     arr.sort((a, b) => {
       const key = (row) => {
-        if (orderBy === "name") return `${lastNameKey(row.name)}|||${row.name.toLowerCase()}`;
+        if (orderBy === "name") return `${lastNameKey(row.name)}|||${String(row.name || "").toLowerCase()}`;
         if (orderBy === "specialties") return (row.specialties || []).join(", ").toLowerCase();
         if (orderBy === "states") return (row.states || []).join(", ").toLowerCase();
+        if (orderBy === "dnu") return (row.dnu || []).join(", ").toLowerCase();
+        if (orderBy === "wc_state_jurisdiction") return (row.wc_state_jurisdiction || []).join(", ").toLowerCase();
+        if (orderBy === "notes") return String(row.notes || "").toLowerCase();
         return String(row[orderBy] ?? "").toLowerCase();
       };
-      const A = key(a), B = key(b);
+      const A = key(a);
+      const B = key(b);
       if (A < B) return order === "asc" ? -1 : 1;
       if (A > B) return order === "asc" ? 1 : -1;
       return 0;
@@ -317,7 +498,8 @@ export default function ReviewerDirectoryPublic() {
     return arr;
   }, [filtered, orderBy, order]);
 
-  const totalCount = rows.length;
+  const totalLabel = `${sorted.length} total`;
+
   const handleSort = (col) => {
     if (orderBy === col) setOrder((o) => (o === "asc" ? "desc" : "asc"));
     else {
@@ -326,26 +508,60 @@ export default function ReviewerDirectoryPublic() {
     }
   };
 
-  /* ======== Visuals ======== */
-  const pageBg = isDark
-    ? "radial-gradient(1200px 800px at 10% -10%, rgba(58,104,254,0.20), transparent 60%), radial-gradient(1000px 700px at 110% 10%, rgba(122,162,255,0.18), transparent 55%), #0b0e19"
-    : "linear-gradient(180deg, #c9ced6 0%, #c3c9d2 55%, #bfc5ce 100%)";
+  const saveNotes = useCallback(
+    async (id) => {
+      if (!authed) {
+        setNotesError((m) => ({ ...m, [id]: "Not authorized. Please re-enter the access code." }));
+        setNotesEditing((cur) => (cur === id ? null : cur));
+        return;
+      }
+
+      if (notesSaving[id]) return;
+
+      const val = String(notesDraft[id] ?? "");
+
+      setNotesSaving((m) => ({ ...m, [id]: true }));
+      setNotesError((m) => ({ ...m, [id]: "" }));
+
+      try {
+        const { error } = await supabase.from(TABLE_NAME).update({ notes: val }).eq("id", id);
+        if (error) throw error;
+
+        if (!mountedRef.current) return;
+        setRows((prev) => prev.map((r) => (r.id === id ? { ...r, notes: val } : r)));
+        setNotesEditing((cur) => (cur === id ? null : cur));
+      } catch (e) {
+        if (!mountedRef.current) return;
+        setNotesError((m) => ({ ...m, [id]: e?.message || String(e) }));
+      } finally {
+        if (!mountedRef.current) return;
+        setNotesSaving((m) => ({ ...m, [id]: false }));
+      }
+    },
+    [authed, notesDraft, notesSaving]
+  );
+
+  const pageBg =
+    "radial-gradient(1200px 800px at 10% -10%, rgba(58,104,254,0.20), transparent 60%), radial-gradient(1000px 700px at 110% 10%, rgba(122,162,255,0.18), transparent 55%), #0b0e19";
 
   const borderAlpha = highContrast ? 0.75 : 0.26;
-  const borderColor = alpha(isDark ? "#7aa2ff" : "#3b455c", borderAlpha);
+  const borderColor = alpha("#7aa2ff", borderAlpha);
   const outlineThick = highContrast ? 2 : 1;
-  const rowHoverAlpha = highContrast ? (isDark ? 0.25 : 0.20) : (isDark ? 0.09 : 0.07);
-  const rowDivider = `${outlineThick}px solid ${alpha(theme.palette.text.primary, highContrast ? 0.35 : 0.10)}`;
+
+  const rowHoverBg = alpha("#7aa2ff", highContrast ? 0.08 : 0.02);
+  const notesHoverBg = alpha("#ffffff", 0.014);
+  const notesActiveBg = alpha("#7aa2ff", 0.08);
+  const subtlePlaceholder = alpha(theme.palette.text.primary, 0.32);
+
+  const cellBorder = `${outlineThick}px solid ${alpha(theme.palette.text.primary, highContrast ? 0.26 : 0.10)}`;
 
   const glassPaper = {
     p: 2,
     borderRadius: 3,
-    background: isDark
-      ? "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))"
-      : "linear-gradient(180deg, rgba(243,246,252,0.65), rgba(233,237,245,0.55))",
+    background: "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))",
     backdropFilter: "blur(12px)",
     border: `${outlineThick}px solid ${borderColor}`,
-    boxShadow: `0 10px 36px ${alpha(isDark ? "#7aa2ff" : "#3b455c", isDark ? (highContrast ? 0.35 : 0.20) : (highContrast ? 0.34 : 0.22))}`,
+    boxShadow: `0 10px 36px ${alpha("#7aa2ff", 0.2)}`,
   };
 
   const tablePaper = {
@@ -354,12 +570,10 @@ export default function ReviewerDirectoryPublic() {
     flexDirection: "column",
     overflow: "hidden",
     borderRadius: 3,
-    background: isDark
-      ? "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))"
-      : "linear-gradient(180deg, rgba(243,246,252,0.70), rgba(233,237,245,0.60))",
+    background: "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))",
     backdropFilter: "blur(12px)",
     border: `${outlineThick}px solid ${borderColor}`,
-    boxShadow: `0 14px 48px ${alpha(isDark ? "#7aa2ff" : "#3b455c", isDark ? (highContrast ? 0.40 : 0.22) : (highContrast ? 0.38 : 0.24))}`,
+    boxShadow: `0 14px 48px ${alpha("#7aa2ff", 0.22)}`,
   };
 
   const headerCellSX = {
@@ -367,16 +581,16 @@ export default function ReviewerDirectoryPublic() {
     fontWeight: highContrast ? 900 : 800,
     letterSpacing: highContrast ? 0.4 : 0.2,
     color: theme.palette.text.primary,
-    borderBottom: `${outlineThick}px solid ${alpha(theme.palette.text.primary, highContrast ? 0.45 : (isDark ? 0.18 : 0.14))}`,
-    background: highContrast
-      ? (isDark ? alpha("#0b0e19", 0.92) : alpha("#e9eef6", 0.98))
-      : (isDark ? alpha("#0b0e19", 0.65) : alpha("#e9eef6", 0.92)),
+    borderBottom: `${outlineThick}px solid ${alpha(theme.palette.text.primary, 0.18)}`,
+    background: alpha("#0b0e19", 0.65),
     backdropFilter: "blur(8px)",
   };
 
   const isCompact = density === "compact";
-  const tableSize = isCompact ? "small" : "medium";
   const cellPadY = isCompact ? 0.5 : 1.25;
+
+  const NOTES_MIN_W = 340;
+  const NOTES_MAX_W = 520;
 
   return (
     <Box
@@ -390,70 +604,147 @@ export default function ReviewerDirectoryPublic() {
         background: pageBg,
       }}
     >
-      {/* Header: title left, freshness/status right */}
-<Box
-  sx={{
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    flexShrink: 0,
-    flexWrap: "nowrap",
-    gap: 2,
-    pr: 6, // a little breathing room under the fixed top-right menu
-  }}
->
-  <Typography
-    variant="h4"
-    sx={{ fontWeight: 800, letterSpacing: 0.2, minWidth: 0, whiteSpace: "nowrap" }}
-  >
-    PeerLink Panel Directory
-  </Typography>
+      {/* Coverage Map Drawer */}
+      <USReviewerDirectoryDrawer open={mapOpen} onClose={() => setMapOpen(false)} reviewers={sorted} onOpenReviewerDetails={null} />
 
-  {/* right-side meta */}
-  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "nowrap" }}>
-    <Chip
-      size="small"
-      icon={<LiveDot sx={{ fontSize: 10, color: "#22c55e" }} />}
-      label="Live"
-      sx={{
-        height: 22,
-        "& .MuiChip-icon": { mr: 0.3 },
-        background: alpha("#22c55e", 0.12),
-        color: "#22c55e",
-        border: `1px solid ${alpha("#22c55e", 0.5)}`,
-        whiteSpace: "nowrap",
-      }}
-    />
-    <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
-      {lastUpdated ? `Updated · ${formatCT(lastUpdated)} CT` : "Connecting…"}
-    </Typography>
-
-    {STATUS_URL && (
-      <Tooltip title="Service status">
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, whiteSpace: "nowrap" }}>
-          <Box
-            sx={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background:
-                status.color === "default"
-                  ? alpha(theme.palette.text.primary, 0.35)
-                  : status.color,
-            }}
-          />
-          <Typography variant="caption" color="text.secondary">
-            {status.label}
-            {status.uptime != null ? ` • ${status.uptime.toFixed(2)}%` : ""}
+      {/* Refresh snackbar (no layout shift) */}
+      <Snackbar
+        open={refreshSnack && !err}
+        onClose={() => setRefreshSnack(false)}
+        autoHideDuration={1200}
+        TransitionComponent={(p) => <Slide {...p} direction="up" />}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            px: 1.25,
+            py: 0.9,
+            borderRadius: 999,
+            bgcolor: alpha("#0b0e19", 0.70),
+            border: `1px solid ${alpha("#7aa2ff", highContrast ? 0.55 : 0.30)}`,
+            backdropFilter: "blur(12px) saturate(160%)",
+            WebkitBackdropFilter: "blur(12px) saturate(160%)",
+            boxShadow: `0 16px 42px ${alpha("#000", 0.38)}`,
+          }}
+        >
+          <CircularProgress size={14} />
+          <Typography variant="caption" sx={{ fontWeight: 800, whiteSpace: "nowrap" }}>
+            Refreshing directory…
           </Typography>
         </Box>
-      </Tooltip>
-    )}
-  </Box>
-</Box>
+      </Snackbar>
 
-      {/* Filters */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          width: "100%",
+          flexShrink: 0,
+          flexWrap: "nowrap",
+          gap: 2,
+          pr: 6,
+        }}
+      >
+        <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: 0.2, minWidth: 0, whiteSpace: "nowrap" }}>
+          PeerLink Panel Directory
+        </Typography>
+
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "nowrap" }}>
+          <Tooltip title="Open Coverage Map">
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              <IconButton
+                onClick={() => setMapOpen(true)}
+                aria-label="Open Coverage Map"
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 2.75,
+                  border: `1px solid ${alpha("#7aa2ff", 0.38)}`,
+                  bgcolor: alpha("#0b0e19", 0.34),
+                  backdropFilter: "blur(12px) saturate(150%)",
+                  WebkitBackdropFilter: "blur(12px) saturate(150%)",
+                  boxShadow: `0 14px 34px ${alpha("#000", 0.26)}`,
+                  transition: "transform 150ms ease, background 150ms ease, border-color 150ms ease, box-shadow 150ms ease",
+                  "&:hover": {
+                    transform: "translateY(-1px)",
+                    bgcolor: alpha("#7aa2ff", 0.12),
+                    borderColor: alpha("#7aa2ff", 0.68),
+                    boxShadow: `0 18px 44px ${alpha("#000", 0.32)}`,
+                  },
+                  "&:active": { transform: "translateY(0px)" },
+                  "&:focus-visible": {
+                    outline: "none",
+                    boxShadow: `0 0 0 3px ${alpha("#7aa2ff", 0.22)}, 0 14px 34px ${alpha("#000", 0.26)}`,
+                  },
+                }}
+              >
+                <MapIcon
+                  sx={{
+                    fontSize: 19,
+                    color: alpha("#cfe2ff", 0.94),
+                    filter: `drop-shadow(0 10px 16px ${alpha("#000", 0.32)})`,
+                  }}
+                />
+              </IconButton>
+
+              <Box sx={{ lineHeight: 1 }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 950,
+                    color: alpha("#eaf2ff", 0.94),
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Coverage Map
+                </Typography>
+              </Box>
+            </Box>
+          </Tooltip>
+
+          <Chip
+            size="small"
+            icon={<LiveDot sx={{ fontSize: 10, color: "#22c55e" }} />}
+            label="Live"
+            sx={{
+              height: 22,
+              "& .MuiChip-icon": { mr: 0.3 },
+              background: alpha("#22c55e", 0.12),
+              color: "#22c55e",
+              border: `1px solid ${alpha("#22c55e", 0.5)}`,
+              whiteSpace: "nowrap",
+            }}
+          />
+
+          <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+            {lastUpdated ? `Updated · ${formatLocalTime(lastUpdated)}` : "Connecting…"}
+          </Typography>
+
+          {STATUS_URL && (
+            <Tooltip title="Service status">
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, whiteSpace: "nowrap" }}>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: status.color === "default" ? alpha(theme.palette.text.primary, 0.35) : status.color,
+                  }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  {status.label}
+                  {status.uptime != null ? ` • ${status.uptime.toFixed(2)}%` : ""}
+                </Typography>
+              </Box>
+            </Tooltip>
+          )}
+        </Box>
+      </Box>
+
       <Paper sx={{ ...glassPaper, flexShrink: 0 }}>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
           <Autocomplete
@@ -470,10 +761,10 @@ export default function ReviewerDirectoryPublic() {
             value={selStates}
             onChange={(_, v) => setSelStates(v)}
             renderInput={(p) => <TextField {...p} label="State" />}
-            sx={{ minWidth: 220 }}
+            sx={{ minWidth: 240 }}
           />
           <TextField
-            label="Search name, specialty, or state..."
+            label="Search name, specialty, state, DNU, WC state, notes..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             sx={{ minWidth: 280, flex: 1 }}
@@ -485,6 +776,7 @@ export default function ReviewerDirectoryPublic() {
               ),
             }}
           />
+
           <Typography
             variant="subtitle2"
             sx={{
@@ -493,143 +785,310 @@ export default function ReviewerDirectoryPublic() {
               color: theme.palette.text.primary,
               fontWeight: highContrast ? 900 : 600,
               letterSpacing: highContrast ? 0.3 : 0.1,
+              whiteSpace: "nowrap",
             }}
           >
-            {sorted.length} of {totalCount}
+            {totalLabel}
           </Typography>
         </Box>
       </Paper>
 
-      {/* Errors / Loading */}
-      {err && <Alert severity="error" sx={{ flexShrink: 0 }}>{err}</Alert>}
-      {loading && (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0 }}>
-          <CircularProgress size={20} />
-          <Typography variant="body2">Loading…</Typography>
-        </Stack>
+      {err && (
+        <Alert
+          severity="warning"
+          sx={{ flexShrink: 0 }}
+          action={<Chip size="small" label="Retry" onClick={fetchData} sx={{ cursor: "pointer", fontWeight: 700 }} />}
+        >
+          {err}
+        </Alert>
       )}
 
-      {/* Table */}
       <Paper sx={tablePaper}>
         <TableContainer sx={{ flex: 1, overflow: "auto" }}>
-          <Table stickyHeader size={tableSize}>
+          <Table
+            stickyHeader
+            size={isCompact ? "small" : "medium"}
+            sx={{
+              tableLayout: "auto",
+              borderCollapse: "separate",
+              borderSpacing: 0,
+              "& td, & th": { borderBottom: cellBorder, verticalAlign: "top" },
+              "& tr:last-of-type td": { borderBottom: "none" },
+            }}
+          >
             <TableHead>
               <TableRow>
-                <TableCell sx={{ ...headerCellSX, width: 420 }}>
+                <TableCell sx={{ ...headerCellSX, width: 340 }}>
                   <TableSortLabel active={orderBy === "name"} direction={order} onClick={() => handleSort("name")}>
                     Name
                   </TableSortLabel>
                 </TableCell>
+
                 <TableCell sx={{ ...headerCellSX, width: 420 }}>
-                  <TableSortLabel active={orderBy === "specialties"} direction={order} onClick={() => handleSort("specialties")}>
+                  <TableSortLabel
+                    active={orderBy === "specialties"}
+                    direction={order}
+                    onClick={() => handleSort("specialties")}
+                  >
                     Specialties
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ ...headerCellSX, width: 280 }}>
+
+                <TableCell sx={{ ...headerCellSX, width: 360 }}>
                   <TableSortLabel active={orderBy === "states"} direction={order} onClick={() => handleSort("states")}>
                     States of Licensure
+                  </TableSortLabel>
+                </TableCell>
+
+                <TableCell sx={{ ...headerCellSX, width: 150 }}>
+                  <TableSortLabel active={orderBy === "dnu"} direction={order} onClick={() => handleSort("dnu")}>
+                    DNU
+                  </TableSortLabel>
+                </TableCell>
+
+                <TableCell sx={{ ...headerCellSX, width: 180 }}>
+                  <TableSortLabel
+                    active={orderBy === "wc_state_jurisdiction"}
+                    direction={order}
+                    onClick={() => handleSort("wc_state_jurisdiction")}
+                  >
+                    WC State Jurisdiction
+                  </TableSortLabel>
+                </TableCell>
+
+                <TableCell
+                  sx={{
+                    ...headerCellSX,
+                    width: NOTES_MAX_W,
+                    maxWidth: NOTES_MAX_W,
+                    minWidth: NOTES_MIN_W,
+                  }}
+                >
+                  <TableSortLabel active={orderBy === "notes"} direction={order} onClick={() => handleSort("notes")}>
+                    Notes
                   </TableSortLabel>
                 </TableCell>
               </TableRow>
             </TableHead>
 
             <TableBody>
-              {sorted.map((r, idx) => (
-                <TableRow
-                  key={stableRowKey(r, idx)}
-                  hover
-                  sx={{
-                    position: "relative",
-                    borderBottom: rowDivider,
-                    "&:hover": {
-                      background: alpha(theme.palette.primary.main, rowHoverAlpha),
-                      transition: "background 140ms ease",
-                    },
-                    ...(highContrast && {
-                      "&::before": {
-                        content: '""',
-                        position: "absolute",
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 3,
-                        background: theme.palette.primary.main,
-                        opacity: 0.95,
-                      },
-                    }),
-                  }}
-                >
-                  <TableCell sx={{ py: cellPadY, fontWeight: highContrast ? 800 : 600 }}>
-                    {formatDisplayName(r.name)}
-                  </TableCell>
-                  <TableCell sx={{ py: cellPadY }}>
-                    {(r.specialties || []).map((s, i) => {
-                      const bg = colorForSpecialty(s, highContrast);
-                      const fg = contrastText(bg);
-                      return (
+              {sorted.map((r, idx) => {
+                const saving = !!notesSaving[r.id];
+                const nerr = notesError[r.id];
+                const isEditing = notesEditing === r.id;
+                const canEditNotes = authed && r.id != null;
+
+                return (
+                  <TableRow
+                    key={stableRowKey(r, idx)}
+                    hover
+                    sx={{
+                      "&:hover": { background: rowHoverBg },
+                    }}
+                  >
+                    <TableCell sx={{ py: cellPadY, fontWeight: highContrast ? 800 : 600 }}>
+                      {formatDisplayName(r.name)}
+                    </TableCell>
+
+                    <TableCell sx={{ py: cellPadY }}>
+                      {(r.specialties || []).map((s, i) => {
+                        const bg = colorForSpecialty(s, highContrast);
+                        const fg = contrastText(bg);
+                        return (
+                          <Chip
+                            key={`spec-${idx}-${i}-${s}`}
+                            label={s}
+                            size="small"
+                            onClick={() => toggleSpec(s)}
+                            sx={{
+                              m: 0.35,
+                              px: 0.6,
+                              background: highContrast ? bg : colorForSpecialty(s, false),
+                              color: highContrast ? fg : "#fff",
+                              cursor: "pointer",
+                              fontWeight: highContrast ? 800 : 600,
+                              border: `${selSpecs.includes(s) ? 2 : 1}px solid ${
+                                selSpecs.includes(s) ? alpha(theme.palette.primary.main, 0.9) : alpha("#000", 0.22)
+                              }`,
+                            }}
+                          />
+                        );
+                      })}
+                    </TableCell>
+
+                    <TableCell sx={{ py: cellPadY }}>
+                      {(r.states || []).map((st, i) => (
                         <Chip
-                          key={`spec-${idx}-${i}-${s}`}
-                          label={s}
+                          key={`state-${idx}-${i}-${st}`}
+                          label={st}
                           size="small"
-                          onClick={() => toggleSpec(s)}
+                          onClick={() => toggleState(st)}
                           sx={{
                             m: 0.35,
                             px: 0.6,
-                            background: highContrast ? bg : colorForSpecialty(s, false),
-                            color: highContrast ? fg : "#fff",
                             cursor: "pointer",
-                            fontWeight: highContrast ? 800 : 600,
-                            letterSpacing: highContrast ? 0.2 : 0,
-                            border: `${selSpecs.includes(s) ? 2 : outlineThick}px solid ${
-                              selSpecs.includes(s)
-                                ? alpha(theme.palette.primary.main, 0.9)
-                                : alpha("#000", isDark ? 0.22 : 0.2)
+                            fontWeight: highContrast ? 900 : 600,
+                            background: alpha(theme.palette.background.paper, 0.3),
+                            color: theme.palette.text.primary,
+                            border: `${selStates.includes(st) ? 2 : 1}px solid ${
+                              selStates.includes(st) ? theme.palette.primary.main : alpha(theme.palette.text.primary, 0.35)
                             }`,
-                            boxShadow: selSpecs.includes(s)
-                              ? `0 0 0 3px ${alpha(theme.palette.primary.main, 0.35)}`
-                              : (highContrast ? `0 0 0 2px ${alpha("#000", isDark ? 0.35 : 0.18)} inset` : "none"),
                           }}
                         />
-                      );
-                    })}
-                  </TableCell>
-                  <TableCell sx={{ py: cellPadY }}>
-                    {(r.states || []).map((st, i) => (
-                      <Chip
-                        key={`state-${idx}-${i}-${st}`}
-                        label={st}
-                        size="small"
-                        onClick={() => toggleState(st)}
-                        sx={{
-                          m: 0.35,
-                          px: 0.6,
-                          cursor: "pointer",
-                          fontWeight: highContrast ? 900 : 600,
-                          letterSpacing: highContrast ? 0.3 : 0,
-                          textTransform: highContrast ? "uppercase" : "none",
-                          background: highContrast
-                            ? alpha(theme.palette.background.paper, isDark ? 0.15 : 0.9)
-                            : alpha(theme.palette.background.paper, isDark ? 0.3 : 0.4),
-                          color: theme.palette.text.primary,
-                          border: `${selStates.includes(st) ? 2 : outlineThick}px solid ${
-                            selStates.includes(st)
-                              ? theme.palette.primary.main
-                              : alpha(theme.palette.text.primary, highContrast ? 0.6 : (isDark ? 0.35 : 0.18))
-                          }`,
-                          boxShadow: selStates.includes(st)
-                            ? `0 0 0 3px ${alpha(theme.palette.primary.main, 0.35)}`
-                            : (highContrast ? `0 0 0 2px ${alpha("#000", isDark ? 0.35 : 0.18)} inset` : "none"),
-                        }}
-                      />
-                    ))}
-                  </TableCell>
-                </TableRow>
-              ))}
+                      ))}
+                    </TableCell>
+
+                    <TableCell sx={{ py: cellPadY }}>
+                      {(r.dnu || []).length ? (
+                        (r.dnu || []).map((tag, i) => (
+                          <Chip
+                            key={`dnu-${idx}-${i}-${tag}`}
+                            label={tag}
+                            size="small"
+                            sx={{
+                              m: 0.35,
+                              px: 0.6,
+                              fontWeight: 900,
+                              background: alpha("#ef4444", 0.18),
+                              color: "#fff",
+                              border: `1px solid ${alpha("#ef4444", 0.55)}`,
+                            }}
+                          />
+                        ))
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          —
+                        </Typography>
+                      )}
+                    </TableCell>
+
+                    <TableCell sx={{ py: cellPadY }}>
+                      {(r.wc_state_jurisdiction || []).length ? (
+                        (r.wc_state_jurisdiction || []).map((st, i) => (
+                          <Chip
+                            key={`wc-${idx}-${i}-${st}`}
+                            label={st}
+                            size="small"
+                            sx={{
+                              m: 0.35,
+                              px: 0.6,
+                              fontWeight: 800,
+                              background: alpha("#60a5fa", 0.16),
+                              color: theme.palette.text.primary,
+                              border: `1px solid ${alpha("#60a5fa", 0.55)}`,
+                            }}
+                          />
+                        ))
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          —
+                        </Typography>
+                      )}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        py: cellPadY,
+                        px: 1,
+                        width: NOTES_MAX_W,
+                        maxWidth: NOTES_MAX_W,
+                        minWidth: NOTES_MIN_W,
+                        cursor: canEditNotes ? "text" : "default",
+                        "&:hover": canEditNotes ? { backgroundColor: notesHoverBg } : undefined,
+                      }}
+                      onClick={() => {
+                        if (!canEditNotes) return;
+                        setNotesEditing(r.id);
+                        setNotesError((m) => ({ ...m, [r.id]: "" }));
+                        setNotesDraft((m) => ({ ...m, [r.id]: m[r.id] ?? (r.notes ?? "") }));
+                      }}
+                    >
+                      {isEditing ? (
+                        <TextField
+                          autoFocus
+                          multiline
+                          minRows={2}
+                          maxRows={6}
+                          value={notesDraft[r.id] ?? ""}
+                          onChange={(e) => setNotesDraft((m) => ({ ...m, [r.id]: e.target.value }))}
+                          onBlur={() => saveNotes(r.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              saveNotes(r.id);
+                              return;
+                            }
+                            if (e.key === "Escape") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setNotesDraft((m) => ({ ...m, [r.id]: r.notes ?? "" }));
+                              setNotesEditing(null);
+                              return;
+                            }
+                            e.stopPropagation();
+                          }}
+                          size="small"
+                          disabled={saving}
+                          fullWidth
+                          sx={{
+                            "& .MuiInputBase-root": {
+                              fontSize: 13,
+                              lineHeight: 1.35,
+                              background: notesActiveBg,
+                            },
+                            "& .MuiOutlinedInput-root": { borderRadius: 0 },
+                          }}
+                          InputProps={{
+                            endAdornment: saving ? (
+                              <InputAdornment position="end">
+                                <CircularProgress size={14} />
+                              </InputAdornment>
+                            ) : null,
+                          }}
+                        />
+                      ) : toStr(r.notes) ? (
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            color: theme.palette.text.primary,
+                            maxWidth: NOTES_MAX_W,
+                          }}
+                        >
+                          {r.notes}
+                        </Typography>
+                      ) : (
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: 11,
+                            opacity: 0.32,
+                            fontStyle: "italic",
+                            color: subtlePlaceholder,
+                          }}
+                        >
+                          {canEditNotes ? "click to add notes" : "login to edit notes"}
+                        </Typography>
+                      )}
+
+                      {nerr ? (
+                        <Typography variant="caption" sx={{ color: "#ef4444", fontWeight: 700, mt: 0.5, display: "block" }}>
+                          {nerr}
+                        </Typography>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
 
               {!loading && !sorted.length && (
                 <TableRow>
-                  <TableCell colSpan={3}>
-                    <Typography variant="body2" color="text.secondary">No results</Typography>
+                  <TableCell colSpan={6} sx={{ borderBottom: "none" }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No results
+                    </Typography>
                   </TableCell>
                 </TableRow>
               )}
@@ -637,12 +1096,8 @@ export default function ReviewerDirectoryPublic() {
           </Table>
         </TableContainer>
 
-        {/* Footer */}
         <Divider />
         <Box sx={{ px: 2, py: 1.25, display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
-          <Typography variant="caption" color="text.secondary">
-            Information updates live and reflects available reviewers only. Panel directory contains no PHI.
-          </Typography>
           <Box sx={{ ml: "auto" }} />
           <Typography variant="caption" color="text.secondary">
             © {new Date().getFullYear()} PeerLink Medical. All rights reserved.

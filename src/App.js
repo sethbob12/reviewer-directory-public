@@ -6,8 +6,6 @@ import {
 } from "@mui/material";
 import {
   Menu as MenuIcon,
-  Brightness4 as DarkIcon,
-  Brightness7 as LightIcon,
   HelpOutline as HelpIcon,
   Check as CheckIcon,
   ViewAgenda as ComfortableIcon,
@@ -54,7 +52,7 @@ export default function App() {
     window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
 
   // Persisted UI state
-  const [mode, setMode] = useState(LS.get("pl_mode", prefersDark ? "dark" : "light"));
+  const [mode] = useState(LS.get("pl_mode", prefersDark ? "dark" : "light"));
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [density, setDensity] = useState(LS.get("pl_density", "comfortable"));
   const [fontScale, setFontScale] = useState(LS.get("pl_fs", "md"));
@@ -78,11 +76,6 @@ export default function App() {
   useEffect(() => { LS.set("pl_density", density); }, [density]);
   useEffect(() => { LS.set("pl_fs", fontScale); }, [fontScale]);
 
-  const toggleMode = () => {
-    const next = mode === "dark" ? "light" : "dark";
-    setMode(next);
-    sendEvent("pl:set-theme", { mode: next });
-  };
   const applyDensity = (d) => {
     setDensity(d);
     sendEvent("pl:set-density", { density: d });
@@ -222,13 +215,7 @@ export default function App() {
           transformOrigin={{ vertical: "top", horizontal: "right" }}
           slotProps={{ paper: { elevation: 6, sx: { mt: 1.25, minWidth: 260, borderRadius: 2 } } }}
         >
-          {/* Theme toggle */}
-          <MenuItem onClick={() => { toggleMode(); handleCloseMenu(); }}>
-            <ListItemIcon>
-              {mode === "dark" ? <LightIcon fontSize="small" /> : <DarkIcon fontSize="small" />}
-            </ListItemIcon>
-            <ListItemText primary={mode === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"} />
-          </MenuItem>
+      
 
           <Divider />
 
