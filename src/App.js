@@ -4,6 +4,7 @@ import {
   ThemeProvider, CssBaseline, createTheme, IconButton, Tooltip, Box, Paper,
   Menu, MenuItem, ListItemIcon, ListItemText, Divider, Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import {
   Menu as MenuIcon,
   HelpOutline as HelpIcon,
@@ -187,92 +188,295 @@ export default function App() {
     <ThemeProvider theme={theme} key={mode}>
       <CssBaseline enableColorScheme />
 
-      {/* Top-right hamburger (bigger, slightly lower) */}
-      <Box sx={{ position: "fixed", top: 18, right: 14, zIndex: 2000 }}>
-        <Tooltip title="Menu">
-          <Paper elevation={4} sx={{ p: 0.75, borderRadius: 2 }}>
-            <IconButton
-              color="primary"
-              onClick={handleOpenMenu}
-              aria-label="Open display menu"
-              aria-controls={menuOpen ? "display-menu" : undefined}
-              aria-haspopup="true"
-              aria-expanded={menuOpen ? "true" : undefined}
-              sx={{ width: 48, height: 48, "& .MuiSvgIcon-root": { fontSize: 28 } }}
-            >
-              <MenuIcon />
-            </IconButton>
-          </Paper>
-        </Tooltip>
+      {/* Top-right hamburger */}
+<Box sx={{ position: "fixed", top: 14, right: 12, zIndex: 2000 }}>
+  <Tooltip title="Menu">
+    <Paper
+      elevation={0}
+      sx={{
+        p: 0.5,
+        borderRadius: 999,
+        position: "relative",
+        overflow: "hidden",
+        background: "linear-gradient(180deg, rgba(17,23,39,0.62), rgba(17,23,39,0.40))",
+        backdropFilter: "blur(12px) saturate(160%)",
+        WebkitBackdropFilter: "blur(12px) saturate(160%)",
+        border: `1px solid ${alpha("#7aa2ff", 0.28)}`,
+        boxShadow: `0 14px 34px ${alpha("#000", 0.35)}`,
 
-        <Menu
-          id="display-menu"
-          anchorEl={menuAnchor}
-          open={menuOpen}
-          onClose={handleCloseMenu}
-          keepMounted
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          transformOrigin={{ vertical: "top", horizontal: "right" }}
-          slotProps={{ paper: { elevation: 6, sx: { mt: 1.25, minWidth: 260, borderRadius: 2 } } }}
-        >
-      
+        // subtle purple/green accent bloom
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: -2,
+          background:
+            "radial-gradient(420px 120px at 12% 0%, rgba(122,162,255,0.55), transparent 60%), radial-gradient(360px 120px at 100% 0%, rgba(34,197,94,0.42), transparent 55%)",
+          opacity: 0.55,
+          pointerEvents: "none",
+        },
 
-          <Divider />
+        // inner highlight ring
+        "&::after": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          borderRadius: 999,
+          boxShadow: `inset 0 0 0 1px ${alpha("#ffffff", 0.08)}`,
+          pointerEvents: "none",
+        },
+      }}
+    >
+      <IconButton
+        onClick={handleOpenMenu}
+        aria-label="Open display menu"
+        aria-controls={menuOpen ? "display-menu" : undefined}
+        aria-haspopup="true"
+        aria-expanded={menuOpen ? "true" : undefined}
+        sx={{
+          width: 38,
+          height: 38,
+          borderRadius: 999,
+          position: "relative",
+          zIndex: 1,
+          color: alpha("#eaf2ff", 0.92),
+          backgroundColor: alpha("#0b0e19", 0.18),
+          transition: "transform 140ms ease, background 140ms ease, box-shadow 140ms ease, border-color 140ms ease",
+          border: `1px solid ${alpha("#7aa2ff", 0.18)}`,
+          "& .MuiSvgIcon-root": { fontSize: 20 },
 
-          {/* Row density */}
-          <MenuItem onClick={() => { applyDensity("comfortable"); handleCloseMenu(); }}>
-            <ListItemIcon><ComfortableIcon fontSize="small" /></ListItemIcon>
-            <ListItemText primary="Row density: Comfortable" />
-            {density === "comfortable" && <CheckIcon fontSize="small" />}
-          </MenuItem>
-          <MenuItem onClick={() => { applyDensity("compact"); handleCloseMenu(); }}>
-            <ListItemIcon><CompactIcon fontSize="small" /></ListItemIcon>
-            <ListItemText primary="Row density: Compact" />
-            {density === "compact" && <CheckIcon fontSize="small" />}
-          </MenuItem>
+          "&:hover": {
+            transform: "translateY(-1px)",
+            backgroundColor: alpha("#7aa2ff", 0.10),
+            borderColor: alpha("#7aa2ff", 0.36),
+            boxShadow: `0 0 0 3px ${alpha("#7aa2ff", 0.12)}`,
+          },
+          "&:active": { transform: "translateY(0px)" },
+          "&:focus-visible": {
+            outline: "none",
+            boxShadow: `0 0 0 3px ${alpha("#7aa2ff", 0.22)}, 0 14px 34px ${alpha("#000", 0.35)}`,
+          },
+        }}
+      >
+        <MenuIcon />
+      </IconButton>
+    </Paper>
+  </Tooltip>
 
-          <Divider />
+  <Menu
+    id="display-menu"
+    anchorEl={menuAnchor}
+    open={menuOpen}
+    onClose={handleCloseMenu}
+    keepMounted
+    anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+    transformOrigin={{ vertical: "top", horizontal: "right" }}
+    slotProps={{
+      paper: {
+        elevation: 8,
+        sx: {
+          mt: 1.25,
+          minWidth: 270,
+          borderRadius: 2.25,
+          overflow: "hidden",
+          background: "linear-gradient(180deg, rgba(17,23,39,0.92), rgba(17,23,39,0.78))",
+          backdropFilter: "blur(12px) saturate(160%)",
+          WebkitBackdropFilter: "blur(12px) saturate(160%)",
+          border: `1px solid ${alpha("#7aa2ff", 0.22)}`,
+          boxShadow: `0 22px 70px ${alpha("#000", 0.55)}`,
+        },
+      },
+    }}
+  >
+    <Box
+      sx={{
+        px: 1.5,
+        py: 1.1,
+        position: "relative",
+        overflow: "hidden",
+        borderBottom: `1px solid ${alpha("#ffffff", 0.10)}`,
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: -2,
+          background:
+            "radial-gradient(520px 140px at 12% 0%, rgba(122,162,255,0.35), transparent 60%), radial-gradient(520px 140px at 100% 0%, rgba(34,197,94,0.22), transparent 60%)",
+          opacity: 0.85,
+          pointerEvents: "none",
+        },
+      }}
+    >
+      <Typography sx={{ position: "relative", zIndex: 1, fontWeight: 900, color: "#fff", letterSpacing: 0.2 }}>
+        Display
+      </Typography>
+      <Typography sx={{ position: "relative", zIndex: 1, mt: 0.2, fontSize: 12, color: alpha("#eaf2ff", 0.70) }}>
+        Density and font sizing
+      </Typography>
+    </Box>
 
-          {/* Font size */}
-          <MenuItem onClick={() => { applyFontScale("sm"); handleCloseMenu(); }}>
-            <ListItemIcon><FormatSizeIcon fontSize="small" /></ListItemIcon>
-            <ListItemText primary="Font size: Small" />
-            {fontScale === "sm" && <CheckIcon fontSize="small" />}
-          </MenuItem>
-          <MenuItem onClick={() => { applyFontScale("md"); handleCloseMenu(); }}>
-            <ListItemIcon><Typography fontSize="0.9rem" sx={{ opacity: 0.8 }}>A</Typography></ListItemIcon>
-            <ListItemText primary="Font size: Medium" />
-            {fontScale === "md" && <CheckIcon fontSize="small" />}
-          </MenuItem>
-          <MenuItem onClick={() => { applyFontScale("lg"); handleCloseMenu(); }}>
-            <ListItemIcon><Typography fontSize="1.15rem">A</Typography></ListItemIcon>
-            <ListItemText primary="Font size: Large" />
-            {fontScale === "lg" && <CheckIcon fontSize="small" />}
-          </MenuItem>
+    {/* Row density */}
+    <MenuItem
+      onClick={() => {
+        applyDensity("comfortable");
+        handleCloseMenu();
+      }}
+      sx={{
+        py: 1.05,
+        "&:hover": { backgroundColor: alpha("#7aa2ff", 0.10) },
+      }}
+    >
+      <ListItemIcon sx={{ minWidth: 34, color: alpha("#eaf2ff", 0.85) }}>
+        <ComfortableIcon fontSize="small" />
+      </ListItemIcon>
+      <ListItemText
+        primary="Row density: Comfortable"
+        primaryTypographyProps={{ sx: { fontWeight: 800, color: alpha("#eaf2ff", 0.92) } }}
+      />
+      {density === "comfortable" && <CheckIcon fontSize="small" sx={{ color: "#22c55e" }} />}
+    </MenuItem>
 
-          <Divider />
+    <MenuItem
+      onClick={() => {
+        applyDensity("compact");
+        handleCloseMenu();
+      }}
+      sx={{
+        py: 1.05,
+        "&:hover": { backgroundColor: alpha("#7aa2ff", 0.10) },
+      }}
+    >
+      <ListItemIcon sx={{ minWidth: 34, color: alpha("#eaf2ff", 0.85) }}>
+        <CompactIcon fontSize="small" />
+      </ListItemIcon>
+      <ListItemText
+        primary="Row density: Compact"
+        primaryTypographyProps={{ sx: { fontWeight: 800, color: alpha("#eaf2ff", 0.92) } }}
+      />
+      {density === "compact" && <CheckIcon fontSize="small" sx={{ color: "#22c55e" }} />}
+    </MenuItem>
 
-          {/* Help email */}
-          <MenuItem
-            component="a"
-            href={`mailto:seth@peerlinkmedical.com?subject=PeerLink%20Panel%20Directory%20Help&body=${encodeURIComponent(
-              `Hi Seth,%0D%0A%0D%0AContext:%0D%0A- URL: ${window.location.href}%0D%0A- Mode: ${mode}%0D%0A- Density: ${density}%0D%0A- Font: ${fontScale}%0D%0A- UA: ${navigator.userAgent}%0D%0A%0D%0AIssue/Question:%0D%0A`
-            )}`}
-            onClick={handleCloseMenu}
-          >
-            <ListItemIcon><HelpIcon fontSize="small" /></ListItemIcon>
-            <ListItemText primary="Need help? Email support" />
-          </MenuItem>
+    <Divider sx={{ borderColor: alpha("#ffffff", 0.10) }} />
 
-          <Divider />
+    {/* Font size */}
+    <MenuItem
+      onClick={() => {
+        applyFontScale("sm");
+        handleCloseMenu();
+      }}
+      sx={{
+        py: 1.05,
+        "&:hover": { backgroundColor: alpha("#7aa2ff", 0.10) },
+      }}
+    >
+      <ListItemIcon sx={{ minWidth: 34, color: alpha("#eaf2ff", 0.85) }}>
+        <FormatSizeIcon fontSize="small" />
+      </ListItemIcon>
+      <ListItemText
+        primary="Font size: Small"
+        primaryTypographyProps={{ sx: { fontWeight: 800, color: alpha("#eaf2ff", 0.92) } }}
+      />
+      {fontScale === "sm" && <CheckIcon fontSize="small" sx={{ color: "#22c55e" }} />}
+    </MenuItem>
 
-          {/* Sign out */}
-          <MenuItem onClick={handleSignOut}>
-            <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
-            <ListItemText primary="Sign out" />
-          </MenuItem>
-        </Menu>
-      </Box>
+    <MenuItem
+      onClick={() => {
+        applyFontScale("md");
+        handleCloseMenu();
+      }}
+      sx={{
+        py: 1.05,
+        "&:hover": { backgroundColor: alpha("#7aa2ff", 0.10) },
+      }}
+    >
+      <ListItemIcon sx={{ minWidth: 34, color: alpha("#eaf2ff", 0.85) }}>
+        <Typography fontSize="0.95rem" sx={{ opacity: 0.85, fontWeight: 900 }}>
+          A
+        </Typography>
+      </ListItemIcon>
+      <ListItemText
+        primary="Font size: Medium"
+        primaryTypographyProps={{ sx: { fontWeight: 800, color: alpha("#eaf2ff", 0.92) } }}
+      />
+      {fontScale === "md" && <CheckIcon fontSize="small" sx={{ color: "#22c55e" }} />}
+    </MenuItem>
+
+    <MenuItem
+      onClick={() => {
+        applyFontScale("lg");
+        handleCloseMenu();
+      }}
+      sx={{
+        py: 1.05,
+        "&:hover": { backgroundColor: alpha("#7aa2ff", 0.10) },
+      }}
+    >
+      <ListItemIcon sx={{ minWidth: 34, color: alpha("#eaf2ff", 0.85) }}>
+        <Typography fontSize="1.15rem" sx={{ fontWeight: 900 }}>
+          A
+        </Typography>
+      </ListItemIcon>
+      <ListItemText
+        primary="Font size: Large"
+        primaryTypographyProps={{ sx: { fontWeight: 800, color: alpha("#eaf2ff", 0.92) } }}
+      />
+      {fontScale === "lg" && <CheckIcon fontSize="small" sx={{ color: "#22c55e" }} />}
+    </MenuItem>
+
+    <Divider sx={{ borderColor: alpha("#ffffff", 0.10) }} />
+
+    {/* Help email (clean formatting, no double-encoding) */}
+    <MenuItem
+      component="a"
+      onClick={handleCloseMenu}
+      href={`mailto:seth@peerlinkmedical.com?subject=${encodeURIComponent("PeerLink Panel Directory Help")}&body=${encodeURIComponent(
+        [
+          "Hi Seth,",
+          "",
+          "Context:",
+          `- URL: ${window.location.href}`,
+          `- Mode: ${mode}`,
+          `- Density: ${density}`,
+          `- Font: ${fontScale}`,
+          `- UA: ${navigator.userAgent}`,
+          "",
+          "Issue/Question:",
+          "",
+        ].join("\r\n")
+      )}`}
+      sx={{
+        py: 1.05,
+        "&:hover": { backgroundColor: alpha("#7aa2ff", 0.10) },
+      }}
+    >
+      <ListItemIcon sx={{ minWidth: 34, color: alpha("#eaf2ff", 0.85) }}>
+        <HelpIcon fontSize="small" />
+      </ListItemIcon>
+      <ListItemText
+        primary="Need help? Email support"
+        primaryTypographyProps={{ sx: { fontWeight: 800, color: alpha("#eaf2ff", 0.92) } }}
+    
+      />
+    </MenuItem>
+
+    <Divider sx={{ borderColor: alpha("#ffffff", 0.10) }} />
+
+    {/* Sign out */}
+    <MenuItem
+      onClick={handleSignOut}
+      sx={{
+        py: 1.05,
+        "&:hover": { backgroundColor: alpha("#ef4444", 0.10) },
+      }}
+    >
+      <ListItemIcon sx={{ minWidth: 34, color: alpha("#eaf2ff", 0.85) }}>
+        <LogoutIcon fontSize="small" />
+      </ListItemIcon>
+      <ListItemText
+        primary="Sign out"
+        primaryTypographyProps={{ sx: { fontWeight: 800, color: alpha("#eaf2ff", 0.92) } }}
+      />
+    </MenuItem>
+  </Menu>
+</Box>
 
       <ReviewerDirectoryPublic />
     </ThemeProvider>

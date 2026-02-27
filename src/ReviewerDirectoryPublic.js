@@ -22,9 +22,12 @@ import {
   IconButton,
   Snackbar,
   Slide,
+  Button,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
-import { Search as SearchIcon, Circle as LiveDot, MapRounded as MapIcon } from "@mui/icons-material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { Search as SearchIcon, Circle as LiveDot, MapRounded as MapIcon, ClearAll as ClearAllIcon } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
 import { supabase } from "./supabaseClient.js";
 import USReviewerDirectoryDrawer from "./USReviewerDirectoryDrawer.js";
 
@@ -200,18 +203,18 @@ function contrastText(hex) {
 
 function formatLocalTime(d) {
   try {
-    return new Intl.DateTimeFormat(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(d);
+    return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(d);
   } catch {
     return d?.toLocaleTimeString?.() || "";
   }
 }
 
-export default function ReviewerDirectoryPublic() {
-  const theme = useTheme();
+function uniq(arr) {
+  return Array.from(new Set((arr || []).filter(Boolean)));
+}
 
+export default function ReviewerDirectoryPublic() {
+  
   const [density, setDensity] = useState("comfortable");
   const [highContrast, setHighContrast] = useState(false);
 
@@ -226,6 +229,7 @@ export default function ReviewerDirectoryPublic() {
 
   const [selSpecs, setSelSpecs] = useState([]);
   const [selStates, setSelStates] = useState([]);
+  const [hasWCOnly, setHasWCOnly] = useState(false);
 
   const [lastUpdated, setLastUpdated] = useState(null);
   const [status, setStatus] = useState({ label: "Unknown", color: "default", uptime: null });
@@ -243,10 +247,147 @@ export default function ReviewerDirectoryPublic() {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const snackHideTimer = useRef(null);
 
+  const [chipExpand, setChipExpand] = useState({});
+
   const debounceTimer = useRef(null);
   const statusTimer = useRef(null);
   const refreshTimer = useRef(null);
   const mountedRef = useRef(true);
+
+  const TXT_PRIMARY = alpha("#eaf2ff", 0.94);
+  const TXT_SECONDARY = alpha("#eaf2ff", 0.72);
+  const TXT_MUTED = alpha("#eaf2ff", 0.55);
+  const PLACEHOLDER = alpha("#eaf2ff", 0.34);
+
+  const pageBg =
+    "radial-gradient(1200px 800px at 10% -10%, rgba(58,104,254,0.20), transparent 60%), radial-gradient(1000px 700px at 110% 10%, rgba(122,162,255,0.18), transparent 55%), #0b0e19";
+
+  const borderAlpha = highContrast ? 0.75 : 0.26;
+  const borderColor = alpha("#7aa2ff", borderAlpha);
+  const outlineThick = highContrast ? 2 : 1;
+
+  const rowHoverBg = alpha("#7aa2ff", highContrast ? 0.08 : 0.03);
+  const rowStripeBg = alpha("#ffffff", 0.02);
+  const notesHoverBg = alpha("#ffffff", 0.014);
+  const notesActiveBg = alpha("#7aa2ff", 0.08);
+
+  const cellBorder = `${outlineThick}px solid ${alpha("#ffffff", highContrast ? 0.24 : 0.12)}`;
+
+  const glassPaper = {
+  p: 2,
+  borderRadius: 3,
+  color: TXT_PRIMARY,
+  position: "relative",
+  background: "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))",
+  backdropFilter: "blur(12px)",
+  WebkitBackdropFilter: "blur(12px)",
+  border: `${outlineThick}px solid ${borderColor}`,
+  boxShadow: `0 10px 36px ${alpha("#7aa2ff", 0.2)}`,
+  "& .MuiTypography-root": { color: "inherit" },
+
+  "&:before": {
+    content: '""',
+    position: "absolute",
+    left: 12,
+    right: 12,
+    top: 0,
+    height: 2,
+    borderRadius: 999,
+    background: `linear-gradient(
+      90deg,
+      ${alpha("#7aa2ff", 0)},
+      ${alpha("#7aa2ff", 0.55)},
+      ${alpha("#22c55e", 0.35)},
+      ${alpha("#7aa2ff", 0)}
+    )`,
+  },
+};
+
+  const tablePaper = {
+  flex: 1,
+minHeight: 0,
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  borderRadius: 3,
+  color: TXT_PRIMARY,
+  background: "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))",
+  backdropFilter: "blur(12px)",
+  border: `${outlineThick}px solid ${borderColor}`,
+  boxShadow: `0 14px 48px ${alpha("#7aa2ff", 0.22)}`,
+  "& .MuiTypography-root": { color: "inherit" },
+};
+
+  const headerCellSX = {
+  position: "sticky",
+  top: 0,
+  zIndex: 30,
+
+  textTransform: highContrast ? "uppercase" : "none",
+  fontWeight: 900,
+  letterSpacing: 0.4,
+  color: "#ffffff",
+  borderBottom: `${outlineThick}px solid ${alpha("#ffffff", 0.25)}`,
+
+  backgroundColor: alpha("#0b0e19", 0.92),
+  backgroundImage: "none",
+  backdropFilter: "none",
+  WebkitBackdropFilter: "none",
+
+  "& .MuiTableSortLabel-root": {
+    color: "#ffffff",
+    fontWeight: 900,
+    "&:hover": { color: "#ffffff" },
+    "&.Mui-active": { color: "#ffffff" },
+  },
+  "& .MuiTableSortLabel-icon": { color: alpha("#ffffff", 0.9) },
+  "& .MuiTableSortLabel-root.Mui-active .MuiTableSortLabel-icon": { color: "#ffffff" },
+};
+
+  const darkFieldSX = {
+    "& .MuiInputLabel-root": { color: TXT_SECONDARY },
+    "& .MuiInputLabel-root.Mui-focused": { color: "#fff" },
+    "& .MuiInputBase-root": { color: TXT_PRIMARY },
+    "& .MuiOutlinedInput-root": {
+      borderRadius: 14,
+      backgroundColor: alpha("#0b0e19", 0.28),
+      backdropFilter: "blur(10px) saturate(150%)",
+      WebkitBackdropFilter: "blur(10px) saturate(150%)",
+      "& fieldset": { borderColor: alpha("#7aa2ff", 0.35) },
+      "&:hover fieldset": { borderColor: alpha("#7aa2ff", 0.60) },
+      "&.Mui-focused fieldset": { borderColor: alpha("#7aa2ff", 0.82) },
+    },
+    "& input::placeholder": { color: PLACEHOLDER, opacity: 1 },
+    "& textarea::placeholder": { color: PLACEHOLDER, opacity: 1 },
+    "& .MuiSvgIcon-root": { color: TXT_SECONDARY },
+    "& .MuiChip-root": {
+      color: TXT_PRIMARY,
+      background: alpha("#0b0e19", 0.22),
+      border: `1px solid ${alpha("#7aa2ff", 0.35)}`,
+    },
+    "& .MuiAutocomplete-popupIndicator": { color: TXT_SECONDARY },
+    "& .MuiAutocomplete-clearIndicator": { color: TXT_SECONDARY },
+  };
+
+  const isCompact = density === "compact";
+  const cellPadY = isCompact ? 0.5 : 1.05;
+
+  const NOTES_MIN_W = 340;
+  const NOTES_MAX_W = 520;
+
+  const CHIP_M = 0.22;
+  const CHIP_PX = 0.5;
+
+  const toggleSpec = (s) => setSelSpecs((cs) => (cs.includes(s) ? cs.filter((x) => x !== s) : [...cs, s]));
+  const toggleState = (st) => setSelStates((cs) => (cs.includes(st) ? cs.filter((x) => x !== st) : [...cs, st]));
+
+  const clearAllFilters = useCallback(() => {
+    setSelSpecs([]);
+    setSelStates([]);
+    setHasWCOnly(false);
+    setSearch("");
+    setDebouncedSearch("");
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -273,7 +414,6 @@ export default function ReviewerDirectoryPublic() {
       if (!e || e.key === AUTH_KEY) sync();
     };
     window.addEventListener("storage", onStorage);
-
     const t = setInterval(sync, 30000);
     return () => {
       window.removeEventListener("storage", onStorage);
@@ -346,8 +486,6 @@ export default function ReviewerDirectoryPublic() {
         .select("id,name,specialties,states,dnu,wc_state_jurisdiction,notes,availability")
         .order("name", { ascending: true });
 
-    
-
       if (error) throw error;
 
       const normalized = normalizeRows(data);
@@ -384,6 +522,7 @@ export default function ReviewerDirectoryPublic() {
     fetchData();
   }, [fetchData]);
 
+  // Refresh every 10 minutes (+ when tab becomes visible)
   useEffect(() => {
     refreshTimer.current = setInterval(() => {
       fetchData();
@@ -426,9 +565,6 @@ export default function ReviewerDirectoryPublic() {
   const allSpecialties = useMemo(() => Array.from(new Set(rows.flatMap((r) => r.specialties || []))).sort(), [rows]);
   const allStates = useMemo(() => Array.from(new Set(rows.flatMap((r) => r.states || []))).sort(), [rows]);
 
-  const toggleSpec = (s) => setSelSpecs((cs) => (cs.includes(s) ? cs.filter((x) => x !== s) : [...cs, s]));
-  const toggleState = (st) => setSelStates((cs) => (cs.includes(st) ? cs.filter((x) => x !== st) : [...cs, st]));
-
   const rowHasSpecialty = (row, wanted) => {
     if (!wanted) return true;
     const syns = expandSpecialtySynonyms(wanted);
@@ -456,12 +592,13 @@ export default function ReviewerDirectoryPublic() {
     return rowsWithHay
       .filter((r) => String(r.availability || "Available") !== "Unavailable")
       .filter((r) => {
+        if (hasWCOnly && !(r.wc_state_jurisdiction || []).length) return false;
         if (selSpecs.length && !selSpecs.every((s) => rowHasSpecialty(r, s))) return false;
         if (selStates.length && !selStates.every((s) => (r.states || []).includes(s))) return false;
         if (!terms.length) return true;
         return terms.every((t) => r._hay.includes(t));
       });
-  }, [rowsWithHay, debouncedSearch, selSpecs, selStates]);
+  }, [rowsWithHay, debouncedSearch, selSpecs, selStates, hasWCOnly]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -501,11 +638,9 @@ export default function ReviewerDirectoryPublic() {
         setNotesEditing((cur) => (cur === id ? null : cur));
         return;
       }
-
       if (notesSaving[id]) return;
 
       const val = String(notesDraft[id] ?? "");
-
       setNotesSaving((m) => ({ ...m, [id]: true }));
       setNotesError((m) => ({ ...m, [id]: "" }));
 
@@ -527,123 +662,101 @@ export default function ReviewerDirectoryPublic() {
     [authed, notesDraft, notesSaving]
   );
 
-  const TXT_PRIMARY = alpha("#eaf2ff", 0.94);
-  const TXT_SECONDARY = alpha("#eaf2ff", 0.72);
-  const TXT_MUTED = alpha("#eaf2ff", 0.55);
-  const PLACEHOLDER = alpha("#eaf2ff", 0.34);
+  const chipKey = (id, col) => `${id}:${col}`;
+  const isExpanded = (id, col) => !!chipExpand[chipKey(id, col)];
+  const toggleExpand = (id, col) => setChipExpand((m) => ({ ...m, [chipKey(id, col)]: !m[chipKey(id, col)] }));
 
-  const pageBg =
-    "radial-gradient(1200px 800px at 10% -10%, rgba(58,104,254,0.20), transparent 60%), radial-gradient(1000px 700px at 110% 10%, rgba(122,162,255,0.18), transparent 55%), #0b0e19";
+  const renderGroupedChips = ({
+    id,
+    col,
+    items,
+    limit,
+    renderItem,
+    moreLabel,
+    tooltip,
+  }) => {
+    const list = items || [];
+    const expanded = isExpanded(id, col);
+    const shown = expanded ? list : list.slice(0, limit);
+    const remaining = list.length - shown.length;
 
-  const borderAlpha = highContrast ? 0.75 : 0.26;
-  const borderColor = alpha("#7aa2ff", borderAlpha);
-  const outlineThick = highContrast ? 2 : 1;
-
-  const rowHoverBg = alpha("#7aa2ff", highContrast ? 0.08 : 0.02);
-  const notesHoverBg = alpha("#ffffff", 0.014);
-  const notesActiveBg = alpha("#7aa2ff", 0.08);
-
-  const cellBorder = `${outlineThick}px solid ${alpha("#ffffff", highContrast ? 0.24 : 0.12)}`;
-
-  const glassPaper = {
-    p: 2,
-    borderRadius: 3,
-    color: TXT_PRIMARY,
-    background: "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))",
-    backdropFilter: "blur(12px)",
-    border: `${outlineThick}px solid ${borderColor}`,
-    boxShadow: `0 10px 36px ${alpha("#7aa2ff", 0.2)}`,
-    "& .MuiTypography-root": { color: "inherit" },
+    return (
+      <>
+        {shown.map(renderItem)}
+        {!expanded && remaining > 0 ? (
+          <Tooltip title={tooltip || "Show more"}>
+            <Chip
+              size="small"
+              label={moreLabel ? moreLabel(remaining) : `+${remaining}`}
+              onClick={() => toggleExpand(id, col)}
+              sx={{
+                m: CHIP_M,
+                px: CHIP_PX,
+                cursor: "pointer",
+                fontWeight: 900,
+                background: alpha("#0b0e19", 0.28),
+                color: "#fff",
+                border: `1px solid ${alpha("#7aa2ff", 0.45)}`,
+                "&:hover": { background: alpha("#7aa2ff", 0.12) },
+              }}
+            />
+          </Tooltip>
+        ) : null}
+        {expanded && list.length > limit ? (
+          <Tooltip title="Collapse">
+            <Chip
+              size="small"
+              label="Less"
+              onClick={() => toggleExpand(id, col)}
+              sx={{
+                m: CHIP_M,
+                px: CHIP_PX,
+                cursor: "pointer",
+                fontWeight: 900,
+                background: alpha("#0b0e19", 0.28),
+                color: "#fff",
+                border: `1px solid ${alpha("#7aa2ff", 0.45)}`,
+                "&:hover": { background: alpha("#7aa2ff", 0.12) },
+              }}
+            />
+          </Tooltip>
+        ) : null}
+      </>
+    );
   };
 
-  const tablePaper = {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    overflow: "hidden",
-    borderRadius: 3,
-    color: TXT_PRIMARY,
-    background: "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))",
-    backdropFilter: "blur(12px)",
-    border: `${outlineThick}px solid ${borderColor}`,
-    boxShadow: `0 14px 48px ${alpha("#7aa2ff", 0.22)}`,
-    "& .MuiTypography-root": { color: "inherit" },
-  };
+  const activePills = useMemo(() => {
+    const pills = [];
 
+    for (const s of selSpecs) pills.push({ type: "spec", key: `spec:${s}`, label: `Specialty: ${s}`, value: s });
+    for (const st of selStates) pills.push({ type: "state", key: `state:${st}`, label: `State: ${st}`, value: st });
 
-  const headerCellSX = {
-  textTransform: highContrast ? "uppercase" : "none",
-  fontWeight: 900,
-  letterSpacing: 0.4,
-  color: "#ffffff",
-  borderBottom: `${outlineThick}px solid ${alpha("#ffffff", 0.25)}`,
-  background: alpha("#0b0e19", 0.82),
-  backdropFilter: "blur(8px)",
-  "& .MuiTableSortLabel-root": {
-    color: "#ffffff",
-    fontWeight: 900,
-    "&:hover": { color: "#ffffff" },
-    "&.Mui-active": { color: "#ffffff" },
-  },
-  "& .MuiTableSortLabel-icon": {
-    color: alpha("#ffffff", 0.85),
-  },
-  "& .MuiTableSortLabel-root.Mui-active .MuiTableSortLabel-icon": {
-    color: "#ffffff",
-  },
-};
+    const q = debouncedSearch.trim();
+    if (q) pills.push({ type: "search", key: `search:${q}`, label: `Search: ${q}`, value: q });
 
-  const darkFieldSX = {
-    "& .MuiInputLabel-root": { color: TXT_SECONDARY },
-    "& .MuiInputLabel-root.Mui-focused": { color: "#fff" },
-    "& .MuiInputBase-root": { color: TXT_PRIMARY },
-    "& .MuiOutlinedInput-root": {
-      borderRadius: 14,
-      backgroundColor: alpha("#0b0e19", 0.28),
-      backdropFilter: "blur(10px) saturate(150%)",
-      WebkitBackdropFilter: "blur(10px) saturate(150%)",
-      "& fieldset": { borderColor: alpha("#7aa2ff", 0.35) },
-      "&:hover fieldset": { borderColor: alpha("#7aa2ff", 0.60) },
-      "&.Mui-focused fieldset": { borderColor: alpha("#7aa2ff", 0.82) },
-    },
-    "& input::placeholder": { color: PLACEHOLDER, opacity: 1 },
-    "& textarea::placeholder": { color: PLACEHOLDER, opacity: 1 },
-    "& .MuiSvgIcon-root": { color: TXT_SECONDARY },
-    "& .MuiChip-root": {
-      color: TXT_PRIMARY,
-      background: alpha("#0b0e19", 0.22),
-      border: `1px solid ${alpha("#7aa2ff", 0.35)}`,
-    },
-    "& .MuiAutocomplete-popupIndicator": { color: TXT_SECONDARY },
-    "& .MuiAutocomplete-clearIndicator": { color: TXT_SECONDARY },
-  };
+    if (hasWCOnly) pills.push({ type: "wc", key: "wc:only", label: "Has WC Jurisdiction", value: true });
 
-  const isCompact = density === "compact";
-  const cellPadY = isCompact ? 0.5 : 1.25;
+    return pills;
+  }, [selSpecs, selStates, debouncedSearch, hasWCOnly]);
 
-  const NOTES_MIN_W = 340;
-  const NOTES_MAX_W = 520;
+  const hasAnyFilters = selSpecs.length || selStates.length || debouncedSearch.trim() || hasWCOnly;
 
   return (
     <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-        px: { xs: 1, md: 4 },
-        py: { xs: 1.5, md: 4 },
-        background: pageBg,
-        color: TXT_PRIMARY,
-        "& .MuiTypography-root": { color: "inherit" },
-      }}
-    >
-      <USReviewerDirectoryDrawer
-        open={mapOpen}
-        onClose={() => setMapOpen(false)}
-        reviewers={sorted}
-        onOpenReviewerDetails={null}
-      />
+  sx={{
+    height: "100vh",
+    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    px: { xs: 1, md: 4 },
+    py: { xs: 1.5, md: 4 },
+    background: pageBg,
+    color: TXT_PRIMARY,
+    "& .MuiTypography-root": { color: "inherit" },
+  }}
+>
+      <USReviewerDirectoryDrawer open={mapOpen} onClose={() => setMapOpen(false)} reviewers={sorted} onOpenReviewerDetails={null} />
 
       <Snackbar
         open={refreshSnack && !err}
@@ -784,7 +897,14 @@ export default function ReviewerDirectoryPublic() {
             options={allSpecialties}
             value={selSpecs}
             onChange={(_, v) => setSelSpecs(v)}
-            renderInput={(p) => <TextField {...p} label="Specialty" placeholder="e.g., Cardiology / GI / ENT" />}
+            renderInput={(p) => (
+              <TextField
+                {...p}
+                label="Specialty"
+                placeholder="e.g., Cardiology / GI / ENT"
+                
+              />
+            )}
             sx={{ minWidth: 260, ...darkFieldSX }}
           />
           <Autocomplete
@@ -795,33 +915,87 @@ export default function ReviewerDirectoryPublic() {
             renderInput={(p) => <TextField {...p} label="State" />}
             sx={{ minWidth: 240, ...darkFieldSX }}
           />
-          <TextField
-            label="Search name, specialty, state, DNU, WC state, notes..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ minWidth: 280, flex: 1, ...darkFieldSX }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-          />
 
-          <Typography
-            variant="subtitle2"
-            sx={{
-              ml: "auto",
-              pr: 0.5,
-              color: TXT_PRIMARY,
-              fontWeight: highContrast ? 900 : 600,
-              letterSpacing: highContrast ? 0.3 : 0.1,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {totalLabel}
-          </Typography>
+          <Tooltip title="Search matches name, specialties, states, DNU, WC states, and notes">
+            <TextField
+              label="Search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{ minWidth: 260, flex: 1, maxWidth: 560, ...darkFieldSX }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Tooltip title="Search the directory">
+                      <SearchIcon />
+                    </Tooltip>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Tooltip>
+
+          <Tooltip title="Only show reviewers who have at least one WC state listed">
+            <FormControlLabel
+              sx={{
+                ml: 0.5,
+                userSelect: "none",
+                "& .MuiFormControlLabel-label": { color: TXT_PRIMARY, fontWeight: 800, fontSize: 12 },
+              }}
+              control={
+                <Checkbox
+  checked={hasWCOnly}
+  onChange={(e) => setHasWCOnly(e.target.checked)}
+  sx={{
+    color: alpha("#22c55e", 0.6),            // unchecked color
+    "&:hover": {
+      backgroundColor: alpha("#22c55e", 0.08),
+    },
+    "&.Mui-checked": {
+      color: "#22c55e",                      // checked icon
+    },
+    "&.Mui-checked:hover": {
+      backgroundColor: alpha("#22c55e", 0.14),
+    },
+  }}
+/>
+              }
+              label="Has WC Jurisdiction"
+            />
+          </Tooltip>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: "auto" }}>
+            {hasAnyFilters ? (
+              <Button
+                size="small"
+                onClick={clearAllFilters}
+                startIcon={<ClearAllIcon />}
+                sx={{
+                  borderRadius: 999,
+                  fontWeight: 900,
+                  color: "#fff",
+                  border: `1px solid ${alpha("#7aa2ff", 0.45)}`,
+                  background: alpha("#0b0e19", 0.22),
+                  "&:hover": { background: alpha("#7aa2ff", 0.10) },
+                }}
+                variant="outlined"
+              >
+                Clear filters
+              </Button>
+            ) : null}
+
+            <Typography
+              variant="subtitle2"
+              sx={{
+                pr: 0.5,
+                color: TXT_PRIMARY,
+                fontWeight: highContrast ? 900 : 700,
+                letterSpacing: highContrast ? 0.3 : 0.1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {totalLabel}
+            </Typography>
+          </Box>
         </Box>
       </Paper>
 
@@ -842,313 +1016,444 @@ export default function ReviewerDirectoryPublic() {
       )}
 
       <Paper sx={tablePaper}>
-        <TableContainer sx={{ flex: 1, overflow: "auto" }}>
-          <Table
-            stickyHeader
-            size={isCompact ? "small" : "medium"}
-            sx={{
-              tableLayout: "auto",
-              borderCollapse: "separate",
-              borderSpacing: 0,
-              "& td, & th": { borderBottom: cellBorder, verticalAlign: "top", color: TXT_PRIMARY },
-              "& tr:last-of-type td": { borderBottom: "none" },
-              "& .MuiTableCell-root": { color: TXT_PRIMARY },
-              "& .MuiTypography-root": { color: "inherit" },
-            }}
-          >
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ ...headerCellSX, width: 340 }}>
-                  <TableSortLabel active={orderBy === "name"} direction={order} onClick={() => handleSort("name")}>
-                    Name
-                  </TableSortLabel>
-                </TableCell>
+        {/* Filter pills summary */}
+        <Box
+          sx={{
+            px: 2,
+            py: 1.25,
+            borderBottom: `1px solid ${alpha("#ffffff", 0.10)}`,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            flexWrap: "wrap",
+          }}
+        >
+          <Tooltip title="Active filters. Click a pill to remove it.">
+            <Typography variant="caption" sx={{ color: TXT_SECONDARY, fontWeight: 900, letterSpacing: 0.3 }}>
+              Filters:
+            </Typography>
+          </Tooltip>
 
-                <TableCell sx={{ ...headerCellSX, width: 420 }}>
-                  <TableSortLabel
-                    active={orderBy === "specialties"}
-                    direction={order}
-                    onClick={() => handleSort("specialties")}
-                  >
-                    Specialties
-                  </TableSortLabel>
-                </TableCell>
-
-                <TableCell sx={{ ...headerCellSX, width: 360 }}>
-                  <TableSortLabel active={orderBy === "states"} direction={order} onClick={() => handleSort("states")}>
-                    States of Licensure
-                  </TableSortLabel>
-                </TableCell>
-
-                <TableCell sx={{ ...headerCellSX, width: 150 }}>
-                  <TableSortLabel active={orderBy === "dnu"} direction={order} onClick={() => handleSort("dnu")}>
-                    DNU
-                  </TableSortLabel>
-                </TableCell>
-
-                <TableCell sx={{ ...headerCellSX, width: 180 }}>
-                  <TableSortLabel
-                    active={orderBy === "wc_state_jurisdiction"}
-                    direction={order}
-                    onClick={() => handleSort("wc_state_jurisdiction")}
-                  >
-                    WC State Jurisdiction
-                  </TableSortLabel>
-                </TableCell>
-
-                <TableCell
-                  sx={{
-                    ...headerCellSX,
-                    width: NOTES_MAX_W,
-                    maxWidth: NOTES_MAX_W,
-                    minWidth: NOTES_MIN_W,
+          {activePills.length ? (
+            activePills.map((p) => (
+              <Tooltip key={p.key} title="Click to remove this filter">
+                <Chip
+                  size="small"
+                  label={p.label}
+                  onClick={() => {
+                    if (p.type === "spec") setSelSpecs((cs) => cs.filter((x) => x !== p.value));
+                    else if (p.type === "state") setSelStates((cs) => cs.filter((x) => x !== p.value));
+                    else if (p.type === "search") {
+                      setSearch("");
+                      setDebouncedSearch("");
+                    } else if (p.type === "wc") setHasWCOnly(false);
                   }}
-                >
-                  <TableSortLabel active={orderBy === "notes"} direction={order} onClick={() => handleSort("notes")}>
-                    Notes
-                  </TableSortLabel>
-                </TableCell>
-              </TableRow>
-            </TableHead>
+                  sx={{
+                    height: 24,
+                    fontWeight: 900,
+                    color: "#fff",
+                    background: alpha("#7aa2ff", 0.12),
+                    border: `1px solid ${alpha("#7aa2ff", 0.45)}`,
+                    "&:hover": { background: alpha("#7aa2ff", 0.18) },
+                  }}
+                />
+              </Tooltip>
+            ))
+          ) : (
+            <Typography variant="caption" sx={{ color: TXT_MUTED }}>
+              None
+            </Typography>
+          )}
 
-            <TableBody>
-              {sorted.map((r, idx) => {
-                const saving = !!notesSaving[r.id];
-                const nerr = notesError[r.id];
-                const isEditing = notesEditing === r.id;
-                const canEditNotes = authed && r.id != null;
+          <Box sx={{ ml: "auto" }} />
+        </Box>
 
-                return (
-                  <TableRow
-                    key={stableRowKey(r, idx)}
-                    hover
-                    sx={{
-                      "&:hover": { background: rowHoverBg },
-                    }}
-                  >
-                   <TableCell
+       <TableContainer
   sx={{
-    py: cellPadY,
-    fontWeight: 900,
-    color: "#ffffff",
-    textShadow: "0 0 8px rgba(255,255,255,0.15)",
+    flex: 1,
+    minHeight: 0,
+    maxHeight: "100%",
+    overflow: "auto",
+    WebkitOverflowScrolling: "touch",
+    // optional but helps: isolates stacking contexts created by blur/filters
+    position: "relative",
   }}
 >
-  {formatDisplayName(r.name)}
-</TableCell>
+  <Table
+    stickyHeader
+    size={isCompact ? "small" : "medium"}
+    sx={{
+      tableLayout: "auto",
+      borderCollapse: "separate",
+      borderSpacing: 0,
 
-                    <TableCell sx={{ py: cellPadY }}>
-                      {(r.specialties || []).map((s, i) => {
-                        const bg = colorForSpecialty(s, highContrast);
-                        const fg = contrastText(bg);
-                        return (
-                          <Chip
-                            key={`spec-${idx}-${i}-${s}`}
-                            label={s}
-                            size="small"
-                            onClick={() => toggleSpec(s)}
-                            sx={{
-                              m: 0.35,
-                              px: 0.6,
-                              background: highContrast ? bg : colorForSpecialty(s, false),
-                              color: highContrast ? fg : "#fff",
-                              cursor: "pointer",
-                              fontWeight: highContrast ? 800 : 600,
-                              border: `${selSpecs.includes(s) ? 2 : 1}px solid ${
-                                selSpecs.includes(s) ? alpha(theme.palette.primary.main, 0.9) : alpha("#000", 0.22)
-                              }`,
-                            }}
-                          />
-                        );
-                      })}
-                    </TableCell>
+      "& td, & th": { borderBottom: cellBorder, verticalAlign: "top", color: TXT_PRIMARY },
+      "& tr:last-of-type td": { borderBottom: "none" },
+      "& .MuiTableCell-root": { color: TXT_PRIMARY },
+      "& .MuiTypography-root": { color: "inherit" },
 
-                    <TableCell sx={{ py: cellPadY }}>
-                      {(r.states || []).map((st, i) => (
-                        <Chip
-                          key={`state-${idx}-${i}-${st}`}
-                          label={st}
-                          size="small"
-                          onClick={() => toggleState(st)}
-                          sx={{
-                            m: 0.35,
-                            px: 0.6,
-                            cursor: "pointer",
-                            fontWeight: highContrast ? 900 : 600,
-                            background: alpha("#0b0e19", 0.22),
-                            color: TXT_PRIMARY,
-                            border: `${selStates.includes(st) ? 2 : 1}px solid ${
-                              selStates.includes(st) ? alpha("#7aa2ff", 0.95) : alpha("#eaf2ff", 0.30)
-                            }`,
-                            "&:hover": { background: alpha("#7aa2ff", 0.10) },
-                          }}
-                        />
-                      ))}
-                    </TableCell>
+      // optional header shadow line that stays put
+      "& thead tr th": {
+        boxShadow: `inset 0 -1px 0 ${alpha("#ffffff", 0.18)}`,
+      },
+    }}
+  >
+    <TableHead>
+  <TableRow>
+    <TableCell sx={{ ...headerCellSX, width: 390, minWidth: 360 }}>
+      <TableSortLabel active={orderBy === "name"} direction={order} onClick={() => handleSort("name")}>
+        Name
+      </TableSortLabel>
+    </TableCell>
 
-                    <TableCell sx={{ py: cellPadY }}>
-                      {(r.dnu || []).length ? (
-                        (r.dnu || []).map((tag, i) => (
-                          <Chip
-                            key={`dnu-${idx}-${i}-${tag}`}
-                            label={tag}
-                            size="small"
-                            sx={{
-                              m: 0.35,
-                              px: 0.6,
-                              fontWeight: 900,
-                              background: alpha("#ef4444", 0.18),
-                              color: "#fff",
-                              border: `1px solid ${alpha("#ef4444", 0.55)}`,
-                            }}
-                          />
-                        ))
-                      ) : (
-                        <Typography variant="caption" sx={{ color: TXT_MUTED }}>
-                          —
-                        </Typography>
-                      )}
-                    </TableCell>
+    <TableCell sx={{ ...headerCellSX, width: 430 }}>
+      <TableSortLabel active={orderBy === "specialties"} direction={order} onClick={() => handleSort("specialties")}>
+        Specialties
+      </TableSortLabel>
+    </TableCell>
 
-                    <TableCell sx={{ py: cellPadY }}>
-                      {(r.wc_state_jurisdiction || []).length ? (
-                        (r.wc_state_jurisdiction || []).map((st, i) => (
-                          <Chip
-                            key={`wc-${idx}-${i}-${st}`}
-                            label={st}
-                            size="small"
-                            sx={{
-                              m: 0.35,
-                              px: 0.6,
-                              fontWeight: 800,
-                              background: alpha("#60a5fa", 0.16),
-                              color: "#fff",
-                              border: `1px solid ${alpha("#60a5fa", 0.55)}`,
-                            }}
-                          />
-                        ))
-                      ) : (
-                        <Typography variant="caption" sx={{ color: TXT_MUTED }}>
-                          —
-                        </Typography>
-                      )}
-                    </TableCell>
+    <TableCell sx={{ ...headerCellSX, width: 360 }}>
+      <Tooltip title="States where this reviewer has active licensure." placement="top" arrow>
+        <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+          <TableSortLabel active={orderBy === "states"} direction={order} onClick={() => handleSort("states")}>
+            States of Licensure
+          </TableSortLabel>
+        </Box>
+      </Tooltip>
+    </TableCell>
 
-                    <TableCell
-                      sx={{
-                        py: cellPadY,
-                        px: 1,
-                        width: NOTES_MAX_W,
-                        maxWidth: NOTES_MAX_W,
-                        minWidth: NOTES_MIN_W,
-                        cursor: canEditNotes ? "text" : "default",
-                        "&:hover": canEditNotes ? { backgroundColor: notesHoverBg } : undefined,
-                      }}
-                      onClick={() => {
-                        if (!canEditNotes) return;
-                        setNotesEditing(r.id);
-                        setNotesError((m) => ({ ...m, [r.id]: "" }));
-                        setNotesDraft((m) => ({ ...m, [r.id]: m[r.id] ?? (r.notes ?? "") }));
-                      }}
-                    >
-                      {isEditing ? (
-                        <TextField
-                          autoFocus
-                          multiline
-                          minRows={2}
-                          maxRows={6}
-                          value={notesDraft[r.id] ?? ""}
-                          onChange={(e) => setNotesDraft((m) => ({ ...m, [r.id]: e.target.value }))}
-                          onBlur={() => saveNotes(r.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              saveNotes(r.id);
-                              return;
-                            }
-                            if (e.key === "Escape") {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setNotesDraft((m) => ({ ...m, [r.id]: r.notes ?? "" }));
-                              setNotesEditing(null);
-                              return;
-                            }
-                            e.stopPropagation();
-                          }}
-                          size="small"
-                          disabled={saving}
-                          fullWidth
-                          sx={{
-                            "& .MuiInputBase-root": {
-                              fontSize: 13,
-                              lineHeight: 1.35,
-                              background: notesActiveBg,
-                              color: TXT_PRIMARY,
-                            },
-                            "& .MuiOutlinedInput-root": {
-                              borderRadius: 0,
-                              "& fieldset": { borderColor: alpha("#7aa2ff", 0.45) },
-                              "&:hover fieldset": { borderColor: alpha("#7aa2ff", 0.70) },
-                              "&.Mui-focused fieldset": { borderColor: alpha("#7aa2ff", 0.90) },
-                            },
-                          }}
-                          InputProps={{
-                            endAdornment: saving ? (
-                              <InputAdornment position="end">
-                                <CircularProgress size={14} sx={{ color: TXT_PRIMARY }} />
-                              </InputAdornment>
-                            ) : null,
-                          }}
-                        />
-                      ) : toStr(r.notes) ? (
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                            color: TXT_PRIMARY,
-                            maxWidth: NOTES_MAX_W,
-                          }}
-                        >
-                          {r.notes}
-                        </Typography>
-                      ) : (
-                        <Typography
-                          component="span"
-                          sx={{
-                            fontSize: 11,
-                            opacity: 0.45,
-                            fontStyle: "italic",
-                            color: PLACEHOLDER,
-                          }}
-                        >
-                          {canEditNotes ? "click to add notes" : "login to edit notes"}
-                        </Typography>
-                      )}
+    <TableCell sx={{ ...headerCellSX, width: 150 }}>
+      <Tooltip title="DNU means a client has requested this reviewer not be used for that client for any reason." placement="top" arrow>
+        <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+          <TableSortLabel active={orderBy === "dnu"} direction={order} onClick={() => handleSort("dnu")}>
+            DNU
+          </TableSortLabel>
+        </Box>
+      </Tooltip>
+    </TableCell>
 
-                      {nerr ? (
-                        <Typography variant="caption" sx={{ color: "#ef4444", fontWeight: 700, mt: 0.5, display: "block" }}>
-                          {nerr}
-                        </Typography>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                );
+    <TableCell sx={{ ...headerCellSX, width: 200 }}>
+      <Tooltip
+        title="WC State Jurisdiction means the reviewer can handle Workers’ Comp cases in that state and meets any jurisdictional requirements."
+        placement="top"
+        arrow
+      >
+        <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+          <TableSortLabel
+            active={orderBy === "wc_state_jurisdiction"}
+            direction={order}
+            onClick={() => handleSort("wc_state_jurisdiction")}
+          >
+            WC State Jurisdiction
+          </TableSortLabel>
+        </Box>
+      </Tooltip>
+    </TableCell>
+
+    <TableCell
+      sx={{
+        ...headerCellSX,
+        width: NOTES_MAX_W,
+        maxWidth: NOTES_MAX_W,
+        minWidth: NOTES_MIN_W,
+      }}
+    >
+      <Tooltip
+        title="Shared collaborative notes visible to all users. Add anything helpful such as internal classifications, reminders, or context."
+        placement="top"
+        arrow
+      >
+        <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+          <TableSortLabel active={orderBy === "notes"} direction={order} onClick={() => handleSort("notes")}>
+            Notes
+          </TableSortLabel>
+        </Box>
+      </Tooltip>
+    </TableCell>
+  </TableRow>
+</TableHead>
+
+    <TableBody>
+      {sorted.map((r, idx) => {
+        const saving = !!notesSaving[r.id];
+        const nerr = notesError[r.id];
+        const isEditing = notesEditing === r.id;
+        const canEditNotes = authed && r.id != null;
+
+        const stripeBg = idx % 2 === 0 ? rowStripeBg : "transparent";
+
+        return (
+          <TableRow
+            key={stableRowKey(r, idx)}
+            hover
+            sx={{
+              background: stripeBg,
+              "&:hover": { background: rowHoverBg },
+            }}
+          >
+            <TableCell
+              sx={{
+                py: cellPadY,
+                fontWeight: 900,
+                color: "#ffffff",
+                textShadow: "0 0 8px rgba(255,255,255,0.15)",
+              }}
+            >
+              {formatDisplayName(r.name)}
+            </TableCell>
+
+            <TableCell sx={{ py: cellPadY }}>
+              {renderGroupedChips({
+                id: r.id ?? `row-${idx}`,
+                col: "spec",
+                items: uniq(r.specialties || []),
+                limit: 5,
+                tooltip: "Show all specialties",
+                renderItem: (s, i) => {
+                  const bg = colorForSpecialty(s, highContrast);
+                  const fg = contrastText(bg);
+                  return (
+                    <Tooltip key={`spec-${idx}-${i}-${s}`} title="Click to filter by this specialty">
+                      <Chip
+                        label={s}
+                        size="small"
+                        onClick={() => toggleSpec(s)}
+                        sx={{
+                          m: CHIP_M,
+                          px: CHIP_PX,
+                          background: highContrast ? bg : colorForSpecialty(s, false),
+                          color: highContrast ? fg : "#fff",
+                          cursor: "pointer",
+                          fontWeight: highContrast ? 800 : 700,
+                          border: `${selSpecs.includes(s) ? 2 : 1}px solid ${
+                            selSpecs.includes(s) ? alpha("#7aa2ff", 0.95) : alpha("#000", 0.22)
+                          }`,
+                        }}
+                      />
+                    </Tooltip>
+                  );
+                },
               })}
+            </TableCell>
 
-              {!loading && !sorted.length && (
-                <TableRow>
-                  <TableCell colSpan={6} sx={{ borderBottom: "none" }}>
-                    <Typography variant="body2" sx={{ color: TXT_SECONDARY }}>
-                      No results
-                    </Typography>
-                  </TableCell>
-                </TableRow>
+            <TableCell sx={{ py: cellPadY }}>
+              {renderGroupedChips({
+                id: r.id ?? `row-${idx}`,
+                col: "states",
+                items: uniq(r.states || []),
+                limit: 8,
+                tooltip: "Show all states",
+                renderItem: (st, i) => (
+                  <Tooltip key={`state-${idx}-${i}-${st}`} title="Click to filter by this state">
+                    <Chip
+                      label={st}
+                      size="small"
+                      onClick={() => toggleState(st)}
+                      sx={{
+                        m: CHIP_M,
+                        px: CHIP_PX,
+                        cursor: "pointer",
+                        fontWeight: 800,
+                        background: alpha("#0b0e19", 0.22),
+                        color: TXT_PRIMARY,
+                        border: `${selStates.includes(st) ? 2 : 1}px solid ${
+                          selStates.includes(st) ? alpha("#7aa2ff", 0.95) : alpha("#eaf2ff", 0.30)
+                        }`,
+                        "&:hover": { background: alpha("#7aa2ff", 0.10) },
+                      }}
+                    />
+                  </Tooltip>
+                ),
+              })}
+            </TableCell>
+
+            <TableCell sx={{ py: cellPadY }}>
+              {(r.dnu || []).length ? (
+                renderGroupedChips({
+                  id: r.id ?? `row-${idx}`,
+                  col: "dnu",
+                  items: uniq(r.dnu || []),
+                  limit: 3,
+                  tooltip: "Show all DNU tags",
+                  renderItem: (tag, i) => (
+                    <Chip
+                      key={`dnu-${idx}-${i}-${tag}`}
+                      label={tag}
+                      size="small"
+                      sx={{
+                        m: CHIP_M,
+                        px: CHIP_PX,
+                        fontWeight: 900,
+                        background: alpha("#ef4444", 0.18),
+                        color: "#fff",
+                        border: `1px solid ${alpha("#ef4444", 0.55)}`,
+                      }}
+                    />
+                  ),
+                })
+              ) : (
+                <Typography variant="caption" sx={{ color: TXT_MUTED }}>
+                  —
+                </Typography>
               )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+            </TableCell>
+
+            <TableCell sx={{ py: cellPadY }}>
+              {(r.wc_state_jurisdiction || []).length ? (
+                renderGroupedChips({
+                  id: r.id ?? `row-${idx}`,
+                  col: "wc",
+                  items: uniq(r.wc_state_jurisdiction || []),
+                  limit: 6,
+                  tooltip: "Show all WC states",
+                  renderItem: (st, i) => (
+                    <Chip
+                      key={`wc-${idx}-${i}-${st}`}
+                      label={st}
+                      size="small"
+                      sx={{
+                        m: CHIP_M,
+                        px: CHIP_PX,
+                        fontWeight: 900,
+                        background: alpha("#60a5fa", 0.16),
+                        color: "#fff",
+                        border: `1px solid ${alpha("#60a5fa", 0.55)}`,
+                      }}
+                    />
+                  ),
+                })
+              ) : (
+                <Typography variant="caption" sx={{ color: TXT_MUTED }}>
+                  —
+                </Typography>
+              )}
+            </TableCell>
+
+            <TableCell
+              sx={{
+                py: cellPadY,
+                px: 1,
+                width: NOTES_MAX_W,
+                maxWidth: NOTES_MAX_W,
+                minWidth: NOTES_MIN_W,
+                cursor: canEditNotes ? "text" : "default",
+                "&:hover": canEditNotes ? { backgroundColor: notesHoverBg } : undefined,
+              }}
+              onClick={() => {
+                if (!canEditNotes) return;
+                setNotesEditing(r.id);
+                setNotesError((m) => ({ ...m, [r.id]: "" }));
+                setNotesDraft((m) => ({ ...m, [r.id]: m[r.id] ?? (r.notes ?? "") }));
+              }}
+            >
+              {isEditing ? (
+                <TextField
+                  autoFocus
+                  multiline
+                  minRows={2}
+                  maxRows={6}
+                  value={notesDraft[r.id] ?? ""}
+                  onChange={(e) => setNotesDraft((m) => ({ ...m, [r.id]: e.target.value }))}
+                  onBlur={() => saveNotes(r.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      saveNotes(r.id);
+                      return;
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setNotesDraft((m) => ({ ...m, [r.id]: r.notes ?? "" }));
+                      setNotesEditing(null);
+                      return;
+                    }
+                    e.stopPropagation();
+                  }}
+                  size="small"
+                  disabled={saving}
+                  fullWidth
+                  sx={{
+                    "& .MuiInputBase-root": {
+                      fontSize: 13,
+                      lineHeight: 1.35,
+                      background: notesActiveBg,
+                      color: TXT_PRIMARY,
+                    },
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 0,
+                      "& fieldset": { borderColor: alpha("#7aa2ff", 0.45) },
+                      "&:hover fieldset": { borderColor: alpha("#7aa2ff", 0.70) },
+                      "&.Mui-focused fieldset": { borderColor: alpha("#7aa2ff", 0.90) },
+                    },
+                  }}
+                  InputProps={{
+                    endAdornment: saving ? (
+                      <InputAdornment position="end">
+                        <CircularProgress size={14} sx={{ color: TXT_PRIMARY }} />
+                      </InputAdornment>
+                    ) : null,
+                  }}
+                />
+              ) : toStr(r.notes) ? (
+                <Typography
+                  variant="body2"
+                  sx={{
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    color: TXT_PRIMARY,
+                    maxWidth: NOTES_MAX_W,
+                  }}
+                >
+                  {r.notes}
+                </Typography>
+              ) : (
+                <Typography
+                  component="span"
+                  sx={{
+                    fontSize: 11,
+                    opacity: 0.45,
+                    fontStyle: "italic",
+                    color: PLACEHOLDER,
+                  }}
+                >
+                  {canEditNotes ? "click to add notes" : "login to edit notes"}
+                </Typography>
+              )}
+
+              {nerr ? (
+                <Typography variant="caption" sx={{ color: "#ef4444", fontWeight: 700, mt: 0.5, display: "block" }}>
+                  {nerr}
+                </Typography>
+              ) : null}
+            </TableCell>
+          </TableRow>
+        );
+      })}
+
+      {!loading && !sorted.length && (
+        <TableRow>
+          <TableCell colSpan={6} sx={{ borderBottom: "none" }}>
+            <Typography variant="body2" sx={{ color: TXT_SECONDARY }}>
+              No results
+            </Typography>
+            {hasAnyFilters ? (
+              <Button
+                size="small"
+                onClick={clearAllFilters}
+                sx={{ mt: 1, fontWeight: 900, color: "#fff", border: `1px solid ${alpha("#7aa2ff", 0.45)}` }}
+                variant="outlined"
+              >
+                Clear filters
+              </Button>
+            ) : null}
+          </TableCell>
+        </TableRow>
+      )}
+    </TableBody>
+  </Table>
+</TableContainer>
 
         <Divider sx={{ borderColor: alpha("#ffffff", 0.10) }} />
         <Box sx={{ px: 2, py: 1.25, display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
