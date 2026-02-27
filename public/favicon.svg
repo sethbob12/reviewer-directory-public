@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4FC3FF"></stop>
+      <stop offset="100%" stop-color="#007BFF"></stop>
+    </linearGradient>
+  </defs>
+
+  <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-weight="900" font-size="420" fill="url(#blueGradient)">
+    P
+  </text>
+</svg>

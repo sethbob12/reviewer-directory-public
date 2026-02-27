@@ -303,19 +303,42 @@ export default function ReviewerDirectoryPublic() {
   },
 };
 
-  const tablePaper = {
+const tablePaper = {
   flex: 1,
-minHeight: 0,
+  minHeight: 0,
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
   borderRadius: 3,
   color: TXT_PRIMARY,
+
+  position: "relative", // needed for :before
+
   background: "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))",
   backdropFilter: "blur(12px)",
+  WebkitBackdropFilter: "blur(12px)",
   border: `${outlineThick}px solid ${borderColor}`,
   boxShadow: `0 14px 48px ${alpha("#7aa2ff", 0.22)}`,
   "& .MuiTypography-root": { color: "inherit" },
+
+  "&:before": {
+    content: '""',
+    position: "absolute",
+    left: 12,
+    right: 12,
+    top: 0,
+    height: 2,
+    borderRadius: 999,
+    background: `linear-gradient(
+      90deg,
+      ${alpha("#7aa2ff", 0)},
+      ${alpha("#7aa2ff", 0.55)},
+      ${alpha("#22c55e", 0.35)},
+      ${alpha("#7aa2ff", 0)}
+    )`,
+    pointerEvents: "none",
+    zIndex: 2,
+  },
 };
 
   const headerCellSX = {
