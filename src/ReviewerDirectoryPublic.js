@@ -230,19 +230,15 @@ export default function ReviewerDirectoryPublic() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [status, setStatus] = useState({ label: "Unknown", color: "default", uptime: null });
 
-  // Auth state
   const [authed, setAuthed] = useState(() => isAuthedNow());
 
-  // Coverage Map drawer
   const [mapOpen, setMapOpen] = useState(false);
 
-  // Notes inline editing
   const [notesDraft, setNotesDraft] = useState({});
   const [notesSaving, setNotesSaving] = useState({});
   const [notesError, setNotesError] = useState({});
   const [notesEditing, setNotesEditing] = useState(null);
 
-  // Snackbar refresh indicator (no layout shift)
   const [refreshSnack, setRefreshSnack] = useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const snackHideTimer = useRef(null);
@@ -271,7 +267,6 @@ export default function ReviewerDirectoryPublic() {
     };
   }, []);
 
-  // Keep authed in sync if localStorage changes (login in another tab, logout, etc.)
   useEffect(() => {
     const sync = () => setAuthed(isAuthedNow());
     const onStorage = (e) => {
@@ -329,8 +324,8 @@ export default function ReviewerDirectoryPublic() {
 
   const showRefreshingSnack = useCallback(() => {
     if (!mountedRef.current) return;
-    if (!hasLoadedOnce) return; // do not show on first load
-    if (err) return; // don't stack with error state
+    if (!hasLoadedOnce) return;
+    if (err) return;
     setRefreshSnack(true);
     try {
       clearTimeout(snackHideTimer.current);
@@ -351,14 +346,7 @@ export default function ReviewerDirectoryPublic() {
         .select("id,name,specialties,states,dnu,wc_state_jurisdiction,notes,availability")
         .order("name", { ascending: true });
 
-      // eslint-disable-next-line no-console
-      console.log("DIRECTORY FETCH", {
-        url: process.env.REACT_APP_SUPABASE_URL,
-        table: TABLE_NAME,
-        gotRows: Array.isArray(data) ? data.length : null,
-        error: error?.message || null,
-        sample: Array.isArray(data) && data.length ? data[0] : null,
-      });
+    
 
       if (error) throw error;
 
@@ -369,7 +357,6 @@ export default function ReviewerDirectoryPublic() {
       setLastUpdated(new Date());
       setHasLoadedOnce(true);
 
-      // seed drafts but do not clobber active edit
       setNotesDraft((prev) => {
         const next = { ...prev };
         for (const r of normalized) {
@@ -397,11 +384,10 @@ export default function ReviewerDirectoryPublic() {
     fetchData();
   }, [fetchData]);
 
-  // Refresh directory every 15 minutes (+ when tab becomes visible)
   useEffect(() => {
     refreshTimer.current = setInterval(() => {
       fetchData();
-    }, 15 * 60 * 1000);
+    }, 10 * 60 * 1000);
 
     const onVisible = () => {
       if (document.visibilityState === "visible") fetchData();
@@ -541,6 +527,11 @@ export default function ReviewerDirectoryPublic() {
     [authed, notesDraft, notesSaving]
   );
 
+  const TXT_PRIMARY = alpha("#eaf2ff", 0.94);
+  const TXT_SECONDARY = alpha("#eaf2ff", 0.72);
+  const TXT_MUTED = alpha("#eaf2ff", 0.55);
+  const PLACEHOLDER = alpha("#eaf2ff", 0.34);
+
   const pageBg =
     "radial-gradient(1200px 800px at 10% -10%, rgba(58,104,254,0.20), transparent 60%), radial-gradient(1000px 700px at 110% 10%, rgba(122,162,255,0.18), transparent 55%), #0b0e19";
 
@@ -551,17 +542,18 @@ export default function ReviewerDirectoryPublic() {
   const rowHoverBg = alpha("#7aa2ff", highContrast ? 0.08 : 0.02);
   const notesHoverBg = alpha("#ffffff", 0.014);
   const notesActiveBg = alpha("#7aa2ff", 0.08);
-  const subtlePlaceholder = alpha(theme.palette.text.primary, 0.32);
 
-  const cellBorder = `${outlineThick}px solid ${alpha(theme.palette.text.primary, highContrast ? 0.26 : 0.10)}`;
+  const cellBorder = `${outlineThick}px solid ${alpha("#ffffff", highContrast ? 0.24 : 0.12)}`;
 
   const glassPaper = {
     p: 2,
     borderRadius: 3,
+    color: TXT_PRIMARY,
     background: "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))",
     backdropFilter: "blur(12px)",
     border: `${outlineThick}px solid ${borderColor}`,
     boxShadow: `0 10px 36px ${alpha("#7aa2ff", 0.2)}`,
+    "& .MuiTypography-root": { color: "inherit" },
   };
 
   const tablePaper = {
@@ -570,20 +562,56 @@ export default function ReviewerDirectoryPublic() {
     flexDirection: "column",
     overflow: "hidden",
     borderRadius: 3,
+    color: TXT_PRIMARY,
     background: "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))",
     backdropFilter: "blur(12px)",
     border: `${outlineThick}px solid ${borderColor}`,
     boxShadow: `0 14px 48px ${alpha("#7aa2ff", 0.22)}`,
+    "& .MuiTypography-root": { color: "inherit" },
+  };
+
+  const sortLabelSX = {
+    color: TXT_PRIMARY,
+    "&:hover": { color: "#fff" },
+    "&.Mui-active": { color: "#fff" },
+    "& .MuiTableSortLabel-icon": { color: alpha("#eaf2ff", 0.78) },
+    "&.Mui-active .MuiTableSortLabel-icon": { color: alpha("#ffffff", 0.92) },
   };
 
   const headerCellSX = {
     textTransform: highContrast ? "uppercase" : "none",
     fontWeight: highContrast ? 900 : 800,
     letterSpacing: highContrast ? 0.4 : 0.2,
-    color: theme.palette.text.primary,
-    borderBottom: `${outlineThick}px solid ${alpha(theme.palette.text.primary, 0.18)}`,
-    background: alpha("#0b0e19", 0.65),
+    color: TXT_PRIMARY,
+    borderBottom: `${outlineThick}px solid ${alpha("#ffffff", 0.16)}`,
+    background: alpha("#0b0e19", 0.72),
     backdropFilter: "blur(8px)",
+    "& .MuiTableSortLabel-root": sortLabelSX,
+  };
+
+  const darkFieldSX = {
+    "& .MuiInputLabel-root": { color: TXT_SECONDARY },
+    "& .MuiInputLabel-root.Mui-focused": { color: "#fff" },
+    "& .MuiInputBase-root": { color: TXT_PRIMARY },
+    "& .MuiOutlinedInput-root": {
+      borderRadius: 14,
+      backgroundColor: alpha("#0b0e19", 0.28),
+      backdropFilter: "blur(10px) saturate(150%)",
+      WebkitBackdropFilter: "blur(10px) saturate(150%)",
+      "& fieldset": { borderColor: alpha("#7aa2ff", 0.35) },
+      "&:hover fieldset": { borderColor: alpha("#7aa2ff", 0.60) },
+      "&.Mui-focused fieldset": { borderColor: alpha("#7aa2ff", 0.82) },
+    },
+    "& input::placeholder": { color: PLACEHOLDER, opacity: 1 },
+    "& textarea::placeholder": { color: PLACEHOLDER, opacity: 1 },
+    "& .MuiSvgIcon-root": { color: TXT_SECONDARY },
+    "& .MuiChip-root": {
+      color: TXT_PRIMARY,
+      background: alpha("#0b0e19", 0.22),
+      border: `1px solid ${alpha("#7aa2ff", 0.35)}`,
+    },
+    "& .MuiAutocomplete-popupIndicator": { color: TXT_SECONDARY },
+    "& .MuiAutocomplete-clearIndicator": { color: TXT_SECONDARY },
   };
 
   const isCompact = density === "compact";
@@ -602,12 +630,17 @@ export default function ReviewerDirectoryPublic() {
         px: { xs: 1, md: 4 },
         py: { xs: 1.5, md: 4 },
         background: pageBg,
+        color: TXT_PRIMARY,
+        "& .MuiTypography-root": { color: "inherit" },
       }}
     >
-      {/* Coverage Map Drawer */}
-      <USReviewerDirectoryDrawer open={mapOpen} onClose={() => setMapOpen(false)} reviewers={sorted} onOpenReviewerDetails={null} />
+      <USReviewerDirectoryDrawer
+        open={mapOpen}
+        onClose={() => setMapOpen(false)}
+        reviewers={sorted}
+        onOpenReviewerDetails={null}
+      />
 
-      {/* Refresh snackbar (no layout shift) */}
       <Snackbar
         open={refreshSnack && !err}
         onClose={() => setRefreshSnack(false)}
@@ -624,10 +657,12 @@ export default function ReviewerDirectoryPublic() {
             py: 0.9,
             borderRadius: 999,
             bgcolor: alpha("#0b0e19", 0.70),
+            color: TXT_PRIMARY,
             border: `1px solid ${alpha("#7aa2ff", highContrast ? 0.55 : 0.30)}`,
             backdropFilter: "blur(12px) saturate(160%)",
             WebkitBackdropFilter: "blur(12px) saturate(160%)",
             boxShadow: `0 16px 42px ${alpha("#000", 0.38)}`,
+            "& .MuiCircularProgress-root": { color: TXT_PRIMARY },
           }}
         >
           <CircularProgress size={14} />
@@ -649,7 +684,7 @@ export default function ReviewerDirectoryPublic() {
           pr: 6,
         }}
       >
-        <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: 0.2, minWidth: 0, whiteSpace: "nowrap" }}>
+        <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: 0.2, minWidth: 0, whiteSpace: "nowrap", color: "#fff" }}>
           PeerLink Panel Directory
         </Typography>
 
@@ -685,21 +720,14 @@ export default function ReviewerDirectoryPublic() {
                 <MapIcon
                   sx={{
                     fontSize: 19,
-                    color: alpha("#cfe2ff", 0.94),
+                    color: alpha("#cfe2ff", 0.98),
                     filter: `drop-shadow(0 10px 16px ${alpha("#000", 0.32)})`,
                   }}
                 />
               </IconButton>
 
               <Box sx={{ lineHeight: 1 }}>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 950,
-                    color: alpha("#eaf2ff", 0.94),
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <Typography variant="caption" sx={{ fontWeight: 950, color: alpha("#ffffff", 0.92), whiteSpace: "nowrap" }}>
                   Coverage Map
                 </Typography>
               </Box>
@@ -720,7 +748,7 @@ export default function ReviewerDirectoryPublic() {
             }}
           />
 
-          <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+          <Typography variant="caption" sx={{ whiteSpace: "nowrap", color: TXT_SECONDARY }}>
             {lastUpdated ? `Updated · ${formatLocalTime(lastUpdated)}` : "Connecting…"}
           </Typography>
 
@@ -732,10 +760,10 @@ export default function ReviewerDirectoryPublic() {
                     width: 8,
                     height: 8,
                     borderRadius: "50%",
-                    background: status.color === "default" ? alpha(theme.palette.text.primary, 0.35) : status.color,
+                    background: status.color === "default" ? alpha("#eaf2ff", 0.35) : status.color,
                   }}
                 />
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" sx={{ color: TXT_SECONDARY }}>
                   {status.label}
                   {status.uptime != null ? ` • ${status.uptime.toFixed(2)}%` : ""}
                 </Typography>
@@ -753,7 +781,7 @@ export default function ReviewerDirectoryPublic() {
             value={selSpecs}
             onChange={(_, v) => setSelSpecs(v)}
             renderInput={(p) => <TextField {...p} label="Specialty" placeholder="e.g., Cardiology / GI / ENT" />}
-            sx={{ minWidth: 260 }}
+            sx={{ minWidth: 260, ...darkFieldSX }}
           />
           <Autocomplete
             multiple
@@ -761,13 +789,13 @@ export default function ReviewerDirectoryPublic() {
             value={selStates}
             onChange={(_, v) => setSelStates(v)}
             renderInput={(p) => <TextField {...p} label="State" />}
-            sx={{ minWidth: 240 }}
+            sx={{ minWidth: 240, ...darkFieldSX }}
           />
           <TextField
             label="Search name, specialty, state, DNU, WC state, notes..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            sx={{ minWidth: 280, flex: 1 }}
+            sx={{ minWidth: 280, flex: 1, ...darkFieldSX }}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
@@ -782,7 +810,7 @@ export default function ReviewerDirectoryPublic() {
             sx={{
               ml: "auto",
               pr: 0.5,
-              color: theme.palette.text.primary,
+              color: TXT_PRIMARY,
               fontWeight: highContrast ? 900 : 600,
               letterSpacing: highContrast ? 0.3 : 0.1,
               whiteSpace: "nowrap",
@@ -796,7 +824,13 @@ export default function ReviewerDirectoryPublic() {
       {err && (
         <Alert
           severity="warning"
-          sx={{ flexShrink: 0 }}
+          sx={{
+            flexShrink: 0,
+            bgcolor: alpha("#0b0e19", 0.55),
+            color: TXT_PRIMARY,
+            border: `1px solid ${alpha("#f59e0b", 0.35)}`,
+            "& .MuiAlert-icon": { color: "#f59e0b" },
+          }}
           action={<Chip size="small" label="Retry" onClick={fetchData} sx={{ cursor: "pointer", fontWeight: 700 }} />}
         >
           {err}
@@ -812,8 +846,10 @@ export default function ReviewerDirectoryPublic() {
               tableLayout: "auto",
               borderCollapse: "separate",
               borderSpacing: 0,
-              "& td, & th": { borderBottom: cellBorder, verticalAlign: "top" },
+              "& td, & th": { borderBottom: cellBorder, verticalAlign: "top", color: TXT_PRIMARY },
               "& tr:last-of-type td": { borderBottom: "none" },
+              "& .MuiTableCell-root": { color: TXT_PRIMARY },
+              "& .MuiTypography-root": { color: "inherit" },
             }}
           >
             <TableHead>
@@ -886,7 +922,7 @@ export default function ReviewerDirectoryPublic() {
                       "&:hover": { background: rowHoverBg },
                     }}
                   >
-                    <TableCell sx={{ py: cellPadY, fontWeight: highContrast ? 800 : 600 }}>
+                    <TableCell sx={{ py: cellPadY, fontWeight: highContrast ? 800 : 600, color: TXT_PRIMARY }}>
                       {formatDisplayName(r.name)}
                     </TableCell>
 
@@ -928,11 +964,12 @@ export default function ReviewerDirectoryPublic() {
                             px: 0.6,
                             cursor: "pointer",
                             fontWeight: highContrast ? 900 : 600,
-                            background: alpha(theme.palette.background.paper, 0.3),
-                            color: theme.palette.text.primary,
+                            background: alpha("#0b0e19", 0.22),
+                            color: TXT_PRIMARY,
                             border: `${selStates.includes(st) ? 2 : 1}px solid ${
-                              selStates.includes(st) ? theme.palette.primary.main : alpha(theme.palette.text.primary, 0.35)
+                              selStates.includes(st) ? alpha("#7aa2ff", 0.95) : alpha("#eaf2ff", 0.30)
                             }`,
+                            "&:hover": { background: alpha("#7aa2ff", 0.10) },
                           }}
                         />
                       ))}
@@ -956,7 +993,7 @@ export default function ReviewerDirectoryPublic() {
                           />
                         ))
                       ) : (
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" sx={{ color: TXT_MUTED }}>
                           —
                         </Typography>
                       )}
@@ -974,13 +1011,13 @@ export default function ReviewerDirectoryPublic() {
                               px: 0.6,
                               fontWeight: 800,
                               background: alpha("#60a5fa", 0.16),
-                              color: theme.palette.text.primary,
+                              color: "#fff",
                               border: `1px solid ${alpha("#60a5fa", 0.55)}`,
                             }}
                           />
                         ))
                       ) : (
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" sx={{ color: TXT_MUTED }}>
                           —
                         </Typography>
                       )}
@@ -1036,13 +1073,19 @@ export default function ReviewerDirectoryPublic() {
                               fontSize: 13,
                               lineHeight: 1.35,
                               background: notesActiveBg,
+                              color: TXT_PRIMARY,
                             },
-                            "& .MuiOutlinedInput-root": { borderRadius: 0 },
+                            "& .MuiOutlinedInput-root": {
+                              borderRadius: 0,
+                              "& fieldset": { borderColor: alpha("#7aa2ff", 0.45) },
+                              "&:hover fieldset": { borderColor: alpha("#7aa2ff", 0.70) },
+                              "&.Mui-focused fieldset": { borderColor: alpha("#7aa2ff", 0.90) },
+                            },
                           }}
                           InputProps={{
                             endAdornment: saving ? (
                               <InputAdornment position="end">
-                                <CircularProgress size={14} />
+                                <CircularProgress size={14} sx={{ color: TXT_PRIMARY }} />
                               </InputAdornment>
                             ) : null,
                           }}
@@ -1053,7 +1096,7 @@ export default function ReviewerDirectoryPublic() {
                           sx={{
                             whiteSpace: "pre-wrap",
                             wordBreak: "break-word",
-                            color: theme.palette.text.primary,
+                            color: TXT_PRIMARY,
                             maxWidth: NOTES_MAX_W,
                           }}
                         >
@@ -1064,9 +1107,9 @@ export default function ReviewerDirectoryPublic() {
                           component="span"
                           sx={{
                             fontSize: 11,
-                            opacity: 0.32,
+                            opacity: 0.45,
                             fontStyle: "italic",
-                            color: subtlePlaceholder,
+                            color: PLACEHOLDER,
                           }}
                         >
                           {canEditNotes ? "click to add notes" : "login to edit notes"}
@@ -1086,7 +1129,7 @@ export default function ReviewerDirectoryPublic() {
               {!loading && !sorted.length && (
                 <TableRow>
                   <TableCell colSpan={6} sx={{ borderBottom: "none" }}>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{ color: TXT_SECONDARY }}>
                       No results
                     </Typography>
                   </TableCell>
@@ -1096,10 +1139,10 @@ export default function ReviewerDirectoryPublic() {
           </Table>
         </TableContainer>
 
-        <Divider />
+        <Divider sx={{ borderColor: alpha("#ffffff", 0.10) }} />
         <Box sx={{ px: 2, py: 1.25, display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
           <Box sx={{ ml: "auto" }} />
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" sx={{ color: TXT_MUTED }}>
             © {new Date().getFullYear()} PeerLink Medical. All rights reserved.
           </Typography>
         </Box>
