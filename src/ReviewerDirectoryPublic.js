@@ -570,24 +570,28 @@ export default function ReviewerDirectoryPublic() {
     "& .MuiTypography-root": { color: "inherit" },
   };
 
-  const sortLabelSX = {
-    color: TXT_PRIMARY,
-    "&:hover": { color: "#fff" },
-    "&.Mui-active": { color: "#fff" },
-    "& .MuiTableSortLabel-icon": { color: alpha("#eaf2ff", 0.78) },
-    "&.Mui-active .MuiTableSortLabel-icon": { color: alpha("#ffffff", 0.92) },
-  };
 
   const headerCellSX = {
-    textTransform: highContrast ? "uppercase" : "none",
-    fontWeight: highContrast ? 900 : 800,
-    letterSpacing: highContrast ? 0.4 : 0.2,
-    color: TXT_PRIMARY,
-    borderBottom: `${outlineThick}px solid ${alpha("#ffffff", 0.16)}`,
-    background: alpha("#0b0e19", 0.72),
-    backdropFilter: "blur(8px)",
-    "& .MuiTableSortLabel-root": sortLabelSX,
-  };
+  textTransform: highContrast ? "uppercase" : "none",
+  fontWeight: 900,
+  letterSpacing: 0.4,
+  color: "#ffffff",
+  borderBottom: `${outlineThick}px solid ${alpha("#ffffff", 0.25)}`,
+  background: alpha("#0b0e19", 0.82),
+  backdropFilter: "blur(8px)",
+  "& .MuiTableSortLabel-root": {
+    color: "#ffffff",
+    fontWeight: 900,
+    "&:hover": { color: "#ffffff" },
+    "&.Mui-active": { color: "#ffffff" },
+  },
+  "& .MuiTableSortLabel-icon": {
+    color: alpha("#ffffff", 0.85),
+  },
+  "& .MuiTableSortLabel-root.Mui-active .MuiTableSortLabel-icon": {
+    color: "#ffffff",
+  },
+};
 
   const darkFieldSX = {
     "& .MuiInputLabel-root": { color: TXT_SECONDARY },
@@ -922,9 +926,16 @@ export default function ReviewerDirectoryPublic() {
                       "&:hover": { background: rowHoverBg },
                     }}
                   >
-                    <TableCell sx={{ py: cellPadY, fontWeight: highContrast ? 800 : 600, color: TXT_PRIMARY }}>
-                      {formatDisplayName(r.name)}
-                    </TableCell>
+                   <TableCell
+  sx={{
+    py: cellPadY,
+    fontWeight: 900,
+    color: "#ffffff",
+    textShadow: "0 0 8px rgba(255,255,255,0.15)",
+  }}
+>
+  {formatDisplayName(r.name)}
+</TableCell>
 
                     <TableCell sx={{ py: cellPadY }}>
                       {(r.specialties || []).map((s, i) => {
