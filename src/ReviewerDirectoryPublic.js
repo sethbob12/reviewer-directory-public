@@ -34,25 +34,6 @@ import USReviewerDirectoryDrawer from "./USReviewerDirectoryDrawer.js";
 const TABLE_NAME = "public_reviewer_directory";
 const STATUS_URL = process.env.REACT_APP_STATUS_URL || null;
 
-const AUTH_KEY = "pl_dir_auth";
-const AUTH_TTL_MS = 12 * 60 * 60 * 1000; // 12h
-
-function readAuthMeta() {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    if (!raw) return { ok: false, t: 0 };
-    const parsed = JSON.parse(raw);
-    const t = Number(parsed?.t || 0);
-    const ok = Date.now() - t < AUTH_TTL_MS;
-    return { ok, t };
-  } catch {
-    return { ok: false, t: 0 };
-  }
-}
-function isAuthedNow() {
-  return readAuthMeta().ok;
-}
-
 const SPEC_SYNONYMS = (() => {
   const map = {};
   const add = (arr) => {
@@ -234,7 +215,8 @@ export default function ReviewerDirectoryPublic() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [status, setStatus] = useState({ label: "Unknown", color: "default", uptime: null });
 
-  const [authed, setAuthed] = useState(() => isAuthedNow());
+  const [authed, setAuthed] = useState(false);
+const [authReady, setAuthReady] = useState(false);
 
   const [mapOpen, setMapOpen] = useState(false);
 
@@ -301,6 +283,11 @@ export default function ReviewerDirectoryPublic() {
       ${alpha("#7aa2ff", 0)}
     )`,
   },
+};
+
+  const handleSignOut = async () => {
+  await supabase.auth.signOut();
+  window.location.replace("/login");
 };
 
 const tablePaper = {
@@ -432,17 +419,38 @@ const tablePaper = {
   }, []);
 
   useEffect(() => {
-    const sync = () => setAuthed(isAuthedNow());
-    const onStorage = (e) => {
-      if (!e || e.key === AUTH_KEY) sync();
-    };
-    window.addEventListener("storage", onStorage);
-    const t = setInterval(sync, 30000);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      clearInterval(t);
-    };
-  }, []);
+  let unsub = null;
+
+
+  const boot = async () => {
+    const { data } = await supabase.auth.getSession();
+    const hasSession = !!data?.session;
+    setAuthed(hasSession);
+    setAuthReady(true);
+
+    if (!hasSession) {
+      window.location.replace("/login");
+    }
+  };
+
+  boot();
+
+  const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const hasSession = !!session;
+    setAuthed(hasSession);
+    setAuthReady(true);
+
+    if (!hasSession) {
+      window.location.replace("/login");
+    }
+  });
+
+  unsub = listener?.subscription;
+
+  return () => {
+    unsub?.unsubscribe?.();
+  };
+}, []);
 
   useEffect(() => {
     const onDensity = (e) => setDensity(e.detail?.density || "comfortable");
@@ -542,27 +550,30 @@ const tablePaper = {
   }, [normalizeRows, notesEditing, showRefreshingSnack]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  if (!authReady) return;
+  if (!authed) return;
+  fetchData();
+}, [fetchData, authReady, authed]);
 
-  // Refresh every 10 minutes (+ when tab becomes visible)
   useEffect(() => {
-    refreshTimer.current = setInterval(() => {
-      fetchData();
-    }, 10 * 60 * 1000);
+  if (!authReady || !authed) return;
 
-    const onVisible = () => {
-      if (document.visibilityState === "visible") fetchData();
-    };
-    document.addEventListener("visibilitychange", onVisible);
+  refreshTimer.current = setInterval(() => {
+    fetchData();
+  }, 10 * 60 * 1000);
 
-    return () => {
-      try {
-        clearInterval(refreshTimer.current);
-      } catch {}
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [fetchData]);
+  const onVisible = () => {
+    if (document.visibilityState === "visible") fetchData();
+  };
+  document.addEventListener("visibilitychange", onVisible);
+
+  return () => {
+    try {
+      clearInterval(refreshTimer.current);
+    } catch {}
+    document.removeEventListener("visibilitychange", onVisible);
+  };
+}, [fetchData, authReady, authed]);
 
   useEffect(() => {
     if (!STATUS_URL) return;
@@ -764,6 +775,23 @@ const tablePaper = {
 
   const hasAnyFilters = selSpecs.length || selStates.length || debouncedSearch.trim() || hasWCOnly;
 
+  if (!authReady) {
+  return (
+    <Box
+      sx={{
+        height: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background:
+          "radial-gradient(1200px 800px at 10% -10%, rgba(58,104,254,0.20), transparent 60%), radial-gradient(1000px 700px at 110% 10%, rgba(122,162,255,0.18), transparent 55%), #0b0e19",
+      }}
+    >
+      <CircularProgress />
+    </Box>
+  );
+}
+
   return (
     <Box
   sx={{
@@ -910,6 +938,21 @@ const tablePaper = {
               </Box>
             </Tooltip>
           )}
+          <Button
+  size="small"
+  variant="outlined"
+  onClick={handleSignOut}
+  sx={{
+    borderRadius: 999,
+    fontWeight: 900,
+    color: "#fff",
+    border: `1px solid ${alpha("#7aa2ff", 0.45)}`,
+    background: alpha("#0b0e19", 0.22),
+    "&:hover": { background: alpha("#7aa2ff", 0.10) },
+  }}
+>
+  Sign out
+</Button>
         </Box>
       </Box>
 
@@ -969,12 +1012,12 @@ const tablePaper = {
   checked={hasWCOnly}
   onChange={(e) => setHasWCOnly(e.target.checked)}
   sx={{
-    color: alpha("#22c55e", 0.6),            // unchecked color
+    color: alpha("#22c55e", 0.6),          
     "&:hover": {
       backgroundColor: alpha("#22c55e", 0.08),
     },
     "&.Mui-checked": {
-      color: "#22c55e",                      // checked icon
+      color: "#22c55e",                   
     },
     "&.Mui-checked:hover": {
       backgroundColor: alpha("#22c55e", 0.14),
@@ -1098,7 +1141,7 @@ const tablePaper = {
     maxHeight: "100%",
     overflow: "auto",
     WebkitOverflowScrolling: "touch",
-    // optional but helps: isolates stacking contexts created by blur/filters
+  
     position: "relative",
   }}
 >
@@ -1115,7 +1158,7 @@ const tablePaper = {
       "& .MuiTableCell-root": { color: TXT_PRIMARY },
       "& .MuiTypography-root": { color: "inherit" },
 
-      // optional header shadow line that stays put
+  
       "& thead tr th": {
         boxShadow: `inset 0 -1px 0 ${alpha("#ffffff", 0.18)}`,
       },

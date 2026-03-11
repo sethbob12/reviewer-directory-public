@@ -1,5 +1,5 @@
 // src/LoginPage.js
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Card,
@@ -17,38 +17,14 @@ import { motion } from "framer-motion";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import BackgroundAnimation from "./BackgroundAnimation.js";
 import { supabase } from "./supabaseClient.js";
 
 /* ---------- config ---------- */
-const PASS_LEN = 6;
-
-// Supabase passcode source (override via env if you want)
-const PASSCODE_TABLE = process.env.REACT_APP_PASSCODE_TABLE || "public_directory_passcodes";
-const PASSCODE_COLUMN = process.env.REACT_APP_PASSCODE_COLUMN || "code";
-const PASSCODE_ACTIVE_COLUMN = process.env.REACT_APP_PASSCODE_ACTIVE_COLUMN || "is_active";
-
-const AUTH_KEY = "pl_dir_auth";
-const AUTH_TTL_MS = 12 * 60 * 60 * 1000; // 12h
-
 const SUPPORT_EMAIL = process.env.REACT_APP_SUPPORT_EMAIL || "seth@peerlinkmedical.com";
 
-/* ---------- auth helpers ---------- */
-function isAuthed() {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    if (!raw) return false;
-    const { t } = JSON.parse(raw);
-    return Date.now() - Number(t) < AUTH_TTL_MS;
-  } catch {
-    return false;
-  }
-}
-function setAuthed() {
-  try {
-    localStorage.setItem(AUTH_KEY, JSON.stringify({ t: Date.now() }));
-  } catch {}
-}
+/* ---------- helpers ---------- */
 function goHome() {
   window.location.replace("/");
 }
@@ -65,134 +41,71 @@ const containerVariants = {
 };
 
 export default function LoginPage() {
-  const [code, setCode] = useState(Array(PASS_LEN).fill(""));
+  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [checking, setChecking] = useState(false);
-  const [shakeKey, setShakeKey] = useState(0);
+  const [sending, setSending] = useState(false);
 
-  const inputRefs = useRef([]);
   const mountedRef = useRef(true);
 
   const mailto = useMemo(() => {
     const subject = encodeURIComponent("PeerLink Directory Access Help");
     const body = encodeURIComponent(
-      "Hi Seth,\n\nI need help accessing the PeerLink Panel Directory.\n\nMy issue:\n"
+      "Hi Seth,\n\nI need help accessing the PeerLink Panel Directory.\n\nMy email address is:\n\nMy issue:\n"
     );
     return `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
   }, []);
 
   useEffect(() => {
     mountedRef.current = true;
+
+    const boot = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) goHome();
+    };
+
+    boot();
+
     return () => {
       mountedRef.current = false;
     };
   }, []);
 
-  /* redirect if already authed */
-  useEffect(() => {
-    if (isAuthed()) goHome();
-  }, []);
+  const handleMagicLink = async () => {
+    const cleanEmail = String(email || "").trim().toLowerCase();
 
-  /* focus first box */
-  useEffect(() => {
-    inputRefs.current[0]?.focus();
-  }, []);
-
-  const resetInputs = () => {
-    setCode(Array(PASS_LEN).fill(""));
-    setTimeout(() => inputRefs.current[0]?.focus(), 10);
-  };
-
-  const checkPasscodeInSupabase = async (entered) => {
-    // attempt with active column
-    const q = supabase.from(PASSCODE_TABLE).select("id").eq(PASSCODE_COLUMN, entered).limit(1);
-
-    const { data, error: err1 } = await q.eq(PASSCODE_ACTIVE_COLUMN, true);
-    if (!err1) return Array.isArray(data) && data.length > 0;
-
-    // fallback (table has no active column or it’s not selectable)
-    const { data: data2, error: err2 } = await supabase
-      .from(PASSCODE_TABLE)
-      .select("id")
-      .eq(PASSCODE_COLUMN, entered)
-      .limit(1);
-
-    if (err2) throw err2;
-    return Array.isArray(data2) && data2.length > 0;
-  };
-
-  const attemptLogin = async (entered) => {
-    if (checking) return;
-
-    const clean = String(entered || "").replace(/\D/g, "").slice(0, PASS_LEN);
-    if (clean.length !== PASS_LEN) {
-      setError(`Enter a ${PASS_LEN}-digit access code.`);
-      setShakeKey((k) => k + 1);
+    if (!cleanEmail) {
+      setError("Enter your email address.");
       return;
     }
 
-    setChecking(true);
+    setError("");
+    setSending(true);
+
     try {
-      const ok = await checkPasscodeInSupabase(clean);
-      if (ok) {
-        setError("");
-        setSuccess(true);
-        setAuthed();
-        setTimeout(goHome, 420);
-      } else {
-        setSuccess(false);
-        setError("Incorrect access code. Please try again.");
-        resetInputs();
-        setShakeKey((k) => k + 1);
-      }
+      const { error: authError } = await supabase.auth.signInWithOtp({
+        email: cleanEmail,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (authError) throw authError;
+
+      if (!mountedRef.current) return;
+      setSuccess(true);
     } catch (e) {
+      if (!mountedRef.current) return;
       setSuccess(false);
-      setError(e?.message || "Login check failed.");
-      setShakeKey((k) => k + 1);
+      setError(
+        e?.message ||
+          "Unable to send magic link. Make sure your email has been authorized."
+      );
     } finally {
       if (!mountedRef.current) return;
-      setChecking(false);
+      setSending(false);
     }
-  };
-
-  const handleChange = (e, index) => {
-    const value = e.target.value;
-
-    if (error) setError("");
-
-    // paste-to-fill in any cell
-    if (value && value.length > 1) {
-      const paste = value.replace(/\D/g, "").slice(0, PASS_LEN);
-      if (paste.length) {
-        const next = Array(PASS_LEN)
-          .fill("")
-          .map((_, i) => paste[i] || "");
-        setCode(next);
-        if (next.every((c) => c !== "")) attemptLogin(next.join(""));
-        return;
-      }
-    }
-
-    const val = value.slice(0, 1).replace(/\D/g, "");
-    const next = [...code];
-    next[index] = val;
-    setCode(next);
-
-    if (val && index < PASS_LEN - 1) inputRefs.current[index + 1]?.focus();
-    if (index === PASS_LEN - 1 && next.every((c) => c !== "")) attemptLogin(next.join(""));
-  };
-
-  const handleKeyDown = (e, index) => {
-    if (e.key === "Backspace" && !code[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-    if (e.key === "Enter") {
-      const joined = code.join("");
-      if (joined.length === PASS_LEN) attemptLogin(joined);
-    }
-    if (e.key === "ArrowLeft" && index > 0) inputRefs.current[index - 1]?.focus();
-    if (e.key === "ArrowRight" && index < PASS_LEN - 1) inputRefs.current[index + 1]?.focus();
   };
 
   return (
@@ -209,12 +122,10 @@ export default function LoginPage() {
         background: "linear-gradient(180deg, #050814 0%, #070c19 40%, #050814 100%)",
       }}
     >
-      {/* animated background */}
       <Box sx={{ position: "absolute", inset: 0, zIndex: 0, opacity: 0.95 }}>
         <BackgroundAnimation isDark />
       </Box>
 
-      {/* studio lighting layer */}
       <Box
         sx={{
           position: "absolute",
@@ -230,7 +141,6 @@ export default function LoginPage() {
         }}
       />
 
-      {/* ultra subtle noise */}
       <Box
         sx={{
           position: "absolute",
@@ -244,7 +154,6 @@ export default function LoginPage() {
         }}
       />
 
-      {/* card */}
       <motion.div
         variants={containerVariants}
         initial="initial"
@@ -259,18 +168,12 @@ export default function LoginPage() {
             px: { xs: 3.4, sm: 5.6 },
             py: { xs: 4.2, sm: 5.6 },
             borderRadius: 7.5,
-
-            // glass
             backdropFilter: "blur(34px) saturate(155%)",
             WebkitBackdropFilter: "blur(34px) saturate(155%)",
             background: "linear-gradient(180deg, rgba(14,18,30,0.78), rgba(14,18,30,0.50))",
-
-            // premium border + depth
             border: "1px solid rgba(210,235,255,0.18)",
             boxShadow:
               "0 56px 170px rgba(0,0,0,0.70), 0 26px 90px rgba(58,104,254,0.16)",
-
-            // subtle inner rim
             "&:before": {
               content: '""',
               position: "absolute",
@@ -280,8 +183,6 @@ export default function LoginPage() {
               boxShadow:
                 "inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -1px 0 rgba(255,255,255,0.04)",
             },
-
-            // thin iridescent border glow
             "&:after": {
               content: '""',
               position: "absolute",
@@ -301,7 +202,6 @@ export default function LoginPage() {
             },
           }}
         >
-          {/* cinematic top glow */}
           <Box
             aria-hidden
             sx={{
@@ -314,19 +214,6 @@ export default function LoginPage() {
             }}
           />
 
-          {/* ultra soft ambient aura */}
-          <Box
-            aria-hidden
-            sx={{
-              position: "absolute",
-              inset: 0,
-              pointerEvents: "none",
-              boxShadow: "0 0 120px rgba(122,162,255,0.12)",
-              opacity: 1,
-            }}
-          />
-
-          {/* slow light sweep */}
           <motion.div
             aria-hidden
             initial={{ x: "-150%", opacity: 0 }}
@@ -395,10 +282,8 @@ export default function LoginPage() {
                   maxWidth: 420,
                 }}
               >
-                Enter your {PASS_LEN}-digit access code to continue.
+                Enter your approved email address and we’ll send you a one-time sign-in link.
               </Typography>
-
-          
             </Stack>
           </Fade>
 
@@ -421,144 +306,108 @@ export default function LoginPage() {
             </Alert>
           )}
 
-          {/* inputs (3 + 3 grouping) */}
-          <motion.div
-            key={shakeKey}
-            animate={{ x: [0, -10, 8, -6, 4, -2, 0] }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-            style={{ position: "relative", zIndex: 2 }}
-          >
-            <Stack direction="row" alignItems="center" justifyContent="center" sx={{ mb: 2.35, mt: 0.7 }}>
-              {code.map((digit, idx) => (
-                <React.Fragment key={idx}>
-                  <TextField
-                    variant="outlined"
-                    value={digit}
-                    disabled={checking || success}
-                    onChange={(e) => handleChange(e, idx)}
-                    onKeyDown={(e) => handleKeyDown(e, idx)}
-                    onPaste={(e) => {
-                      const text = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, PASS_LEN);
-                      if (text.length > 1) {
-                        e.preventDefault();
-                        const next = Array(PASS_LEN)
-                          .fill("")
-                          .map((_, i) => text[i] || "");
-                        setCode(next);
-                        if (next.every((c) => c !== "")) attemptLogin(next.join(""));
-                      }
-                    }}
-                    inputProps={{
-                      maxLength: 1,
-                      inputMode: "numeric",
-                      style: {
-                        textAlign: "center",
-                        fontSize: "1.58rem",
-                        fontWeight: 950,
-                        padding: "0.78rem 0.1rem",
-                        color: "#ffffff",
-                        width: 52,
-                      },
-                    }}
-                    sx={{
-                      mx: 0.68,
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: 3.2,
-                        background: "rgba(255,255,255,0.045)",
-                        transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
-                        "& fieldset": {
-                          borderColor: "rgba(160,210,255,0.20)",
-                          borderWidth: "2px",
-                        },
-                        "&:hover": {
-                          background: "rgba(255,255,255,0.055)",
-                          transform: "translateY(-1px)",
-                        },
-                        "&:hover fieldset": {
-                          borderColor: "rgba(190,228,255,0.45)",
-                        },
-                        "&.Mui-focused": {
-                          background: "rgba(122,162,255,0.07)",
-                        },
-                        "&.Mui-focused fieldset": {
-                          borderColor: "rgba(122,162,255,0.95)",
-                          boxShadow: "0 0 0 4px rgba(122,162,255,0.18)",
-                        },
-                      },
-                    }}
-                    inputRef={(el) => (inputRefs.current[idx] = el)}
-                  />
+          {success && (
+            <Alert
+              severity="success"
+              sx={{
+                mb: 2.1,
+                width: "100%",
+                borderRadius: 3,
+                background: "rgba(16,185,129,0.13)",
+                border: "1px solid rgba(16,185,129,0.20)",
+                color: "rgba(220,255,240,0.96)",
+                "& .MuiAlert-icon": { color: "rgba(110,255,190,0.95)" },
+                position: "relative",
+                zIndex: 2,
+              }}
+            >
+              Magic link sent. Check your email and open the link on this device.
+            </Alert>
+          )}
 
-                  {/* visual grouping between 3 and 3 */}
-                  {idx === 2 && (
-                    <Box
-                      aria-hidden
-                      sx={{
-                        width: 26,
-                        height: 2,
-                        mx: 0.9,
-                        borderRadius: 2,
-                        background:
-                          "linear-gradient(90deg, transparent, rgba(190,228,255,0.42), transparent)",
-                        opacity: 0.95,
-                      }}
-                    />
-                  )}
-                </React.Fragment>
-              ))}
-            </Stack>
-          </motion.div>
+          <Box sx={{ position: "relative", zIndex: 2 }}>
+            <TextField
+              fullWidth
+              type="email"
+              label="Email address"
+              value={email}
+              disabled={sending || success}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (error) setError("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleMagicLink();
+              }}
+              InputProps={{
+                startAdornment: <EmailRoundedIcon sx={{ mr: 1, color: "rgba(190,214,255,0.8)" }} />,
+              }}
+              sx={{
+                mb: 2.35,
+                "& .MuiInputLabel-root": { color: "rgba(190,214,255,0.76)" },
+                "& .MuiInputLabel-root.Mui-focused": { color: "#fff" },
+                "& .MuiInputBase-input": { color: "#fff" },
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 3.2,
+                  background: "rgba(255,255,255,0.045)",
+                  "& fieldset": {
+                    borderColor: "rgba(160,210,255,0.20)",
+                    borderWidth: "2px",
+                  },
+                  "&:hover fieldset": {
+                    borderColor: "rgba(190,228,255,0.45)",
+                  },
+                  "&.Mui-focused": {
+                    background: "rgba(122,162,255,0.07)",
+                  },
+                  "&.Mui-focused fieldset": {
+                    borderColor: "rgba(122,162,255,0.95)",
+                    boxShadow: "0 0 0 4px rgba(122,162,255,0.18)",
+                  },
+                },
+              }}
+            />
 
-          <Button
-            variant="contained"
-            size="large"
-            fullWidth
-            disableElevation
-            disabled={checking || success}
-            onClick={() => attemptLogin(code.join(""))}
-            sx={{
-              mt: 0.1,
-              py: 1.32,
-              fontWeight: 950,
-              fontSize: "1.05rem",
-              borderRadius: 3.2,
-              color: "#fff",
-              background: success
-                ? "linear-gradient(90deg,#0bca82 0%,#00e5b1 100%)"
-                : "linear-gradient(90deg, rgba(58,104,254,1) 0%, rgba(91,182,255,1) 100%)",
-              boxShadow: success
-                ? "0 16px 44px rgba(0,220,160,0.20)"
-                : "0 22px 58px rgba(58,104,254,0.22)",
-              transition: "transform 160ms ease, filter 160ms ease, box-shadow 160ms ease",
-              "&:hover": {
-                transform: "translateY(-1px)",
-                filter: "brightness(1.03)",
-                boxShadow: success
-                  ? "0 18px 50px rgba(0,220,160,0.22)"
-                  : "0 26px 70px rgba(58,104,254,0.26)",
+            <Button
+              variant="contained"
+              size="large"
+              fullWidth
+              disableElevation
+              disabled={sending || success}
+              onClick={handleMagicLink}
+              sx={{
+                mt: 0.1,
+                py: 1.32,
+                fontWeight: 950,
+                fontSize: "1.05rem",
+                borderRadius: 3.2,
+                color: "#fff",
                 background: success
-                  ? "linear-gradient(90deg,#08ac6d 0%,#00c59b 100%)"
-                  : "linear-gradient(90deg, rgba(47,87,217,1) 0%, rgba(78,164,242,1) 100%)",
-              },
-              "&:active": {
-                transform: "translateY(0px)",
-                filter: "brightness(0.99)",
-              },
-            }}
-          >
-            {success ? (
-              "Welcome"
-            ) : checking ? (
-              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
-                <CircularProgress size={16} sx={{ color: "rgba(255,255,255,0.85)" }} />
-                {"Checking…"}
-              </Box>
-            ) : (
-              "Unlock"
-            )}
-          </Button>
+                  ? "linear-gradient(90deg,#0bca82 0%,#00e5b1 100%)"
+                  : "linear-gradient(90deg, rgba(58,104,254,1) 0%, rgba(91,182,255,1) 100%)",
+                boxShadow: success
+                  ? "0 16px 44px rgba(0,220,160,0.20)"
+                  : "0 22px 58px rgba(58,104,254,0.22)",
+                "&:hover": {
+                  background: success
+                    ? "linear-gradient(90deg,#08ac6d 0%,#00c59b 100%)"
+                    : "linear-gradient(90deg, rgba(47,87,217,1) 0%, rgba(78,164,242,1) 100%)",
+                },
+              }}
+            >
+              {success ? (
+                "Check your email"
+              ) : sending ? (
+                <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+                  <CircularProgress size={16} sx={{ color: "rgba(255,255,255,0.85)" }} />
+                  {"Sending link…"}
+                </Box>
+              ) : (
+                "Email magic link"
+              )}
+            </Button>
+          </Box>
 
-          {/* Need help (nicer) */}
           <Box sx={{ mt: 2.1, display: "flex", justifyContent: "center", position: "relative", zIndex: 2 }}>
             <Link
               href={mailto}
@@ -577,14 +426,11 @@ export default function LoginPage() {
                 background: "rgba(255,255,255,0.055)",
                 border: "1px solid rgba(210,235,255,0.18)",
                 backdropFilter: "blur(10px)",
-                transition: "transform 160ms ease, background 160ms ease, border-color 160ms ease, color 160ms ease",
                 "&:hover": {
-                  transform: "translateY(-1px)",
                   background: "rgba(255,255,255,0.085)",
                   borderColor: "rgba(210,235,255,0.30)",
                   color: "#ffffff",
                 },
-                "&:active": { transform: "translateY(0px)" },
               }}
             >
               <HelpOutlineRoundedIcon sx={{ fontSize: 16, opacity: 0.95 }} />
