@@ -28,6 +28,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 
 import ReviewerDirectoryPublic from "./ReviewerDirectoryPublic";
 import LoginPage from "./LoginPage";
+import AuthCallbackPage from "./AuthCallbackPage";
 
 // --------- LocalStorage helpers for UI prefs ----------
 const LS = {
@@ -362,10 +363,11 @@ function AppShell() {
       )}
 
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<ReviewerDirectoryPublic />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+  <Route path="/login" element={<LoginPage />} />
+  <Route path="/auth/callback" element={<AuthCallbackPage />} />
+  <Route path="/" element={<ReviewerDirectoryPublic />} />
+  <Route path="*" element={<Navigate to="/" replace />} />
+</Routes>
     </ThemeProvider>
   );
 }
