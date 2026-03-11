@@ -24,11 +24,6 @@ import { supabase } from "./supabaseClient.js";
 /* ---------- config ---------- */
 const SUPPORT_EMAIL = process.env.REACT_APP_SUPPORT_EMAIL || "seth@peerlinkmedical.com";
 
-/* ---------- helpers ---------- */
-function goHome() {
-  window.location.replace("/");
-}
-
 /* ---------- motion ---------- */
 const containerVariants = {
   initial: { opacity: 0, y: 22, scale: 0.988 },
@@ -57,19 +52,32 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    mountedRef.current = true;
+  let subscription = null;
 
-    const boot = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data?.session) goHome();
-    };
+  const boot = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    boot();
+    if (session && window.location.pathname === "/login") {
+      window.location.replace("/");
+    }
+  };
 
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+  boot();
+
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (session && window.location.pathname === "/login") {
+      window.location.replace("/");
+    }
+  });
+
+  subscription = data?.subscription ?? null;
+
+  return () => {
+    subscription?.unsubscribe?.();
+  };
+}, []);
 
   const handleMagicLink = async () => {
     const cleanEmail = String(email || "").trim().toLowerCase();
@@ -84,12 +92,12 @@ export default function LoginPage() {
 
     try {
       const { error: authError } = await supabase.auth.signInWithOtp({
-        email: cleanEmail,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/`,
-        },
-      });
+  email: cleanEmail,
+  options: {
+    shouldCreateUser: false,
+    emailRedirectTo: "https://reviewer-directory-public.vercel.app/",
+  },
+});
 
       if (authError) throw authError;
 

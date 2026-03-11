@@ -215,7 +215,8 @@ export default function ReviewerDirectoryPublic() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [status, setStatus] = useState({ label: "Unknown", color: "default", uptime: null });
 
-  const [authed, setAuthed] = useState(false);
+  
+const [authed, setAuthed] = useState(false);
 const [authReady, setAuthReady] = useState(false);
 
   const [mapOpen, setMapOpen] = useState(false);
@@ -289,6 +290,46 @@ const [authReady, setAuthReady] = useState(false);
   await supabase.auth.signOut();
   window.location.replace("/login");
 };
+
+useEffect(() => {
+  let subscription = null;
+  let booted = false;
+
+  const boot = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    setAuthed(!!session);
+    setAuthReady(true);
+    booted = true;
+  };
+
+  boot();
+
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    setAuthed(!!session);
+
+    if (booted) {
+      setAuthReady(true);
+    }
+  });
+
+  subscription = data?.subscription ?? null;
+
+  return () => {
+    subscription?.unsubscribe?.();
+  };
+}, []);
+
+useEffect(() => {
+  if (!authReady) return;
+  if (authed) return;
+
+  if (window.location.pathname !== "/login") {
+    window.location.replace("/login");
+  }
+}, [authReady, authed]);
 
 const tablePaper = {
   flex: 1,
@@ -419,40 +460,6 @@ const tablePaper = {
   }, []);
 
   useEffect(() => {
-  let unsub = null;
-
-
-  const boot = async () => {
-    const { data } = await supabase.auth.getSession();
-    const hasSession = !!data?.session;
-    setAuthed(hasSession);
-    setAuthReady(true);
-
-    if (!hasSession) {
-      window.location.replace("/login");
-    }
-  };
-
-  boot();
-
-  const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-    const hasSession = !!session;
-    setAuthed(hasSession);
-    setAuthReady(true);
-
-    if (!hasSession) {
-      window.location.replace("/login");
-    }
-  });
-
-  unsub = listener?.subscription;
-
-  return () => {
-    unsub?.unsubscribe?.();
-  };
-}, []);
-
-  useEffect(() => {
     const onDensity = (e) => setDensity(e.detail?.density || "comfortable");
     const onHC = (e) => setHighContrast(!!e.detail?.highContrast);
     window.addEventListener("pl:set-density", onDensity);
@@ -537,7 +544,7 @@ const tablePaper = {
 
       if (!normalized.length) {
         setErr(
-          "Supabase returned 0 rows. This is almost always RLS enabled with no anon SELECT policy (or SELECT privilege missing). Fix RLS/policy on public.public_reviewer_directory."
+         "Supabase returned 0 rows. Check your authenticated RLS policy on public.public_reviewer_directory."
         );
       }
     } catch (e) {
@@ -668,7 +675,7 @@ const tablePaper = {
   const saveNotes = useCallback(
     async (id) => {
       if (!authed) {
-        setNotesError((m) => ({ ...m, [id]: "Not authorized. Please re-enter the access code." }));
+        setNotesError((m) => ({ ...m, [id]: "Not authorized. Please sign in again." }));
         setNotesEditing((cur) => (cur === id ? null : cur));
         return;
       }
