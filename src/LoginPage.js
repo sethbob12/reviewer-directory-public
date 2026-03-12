@@ -43,13 +43,33 @@ export default function LoginPage() {
 
   const mountedRef = useRef(true);
 
-  const mailto = useMemo(() => {
-    const subject = encodeURIComponent("PeerLink Directory Access Help");
-    const body = encodeURIComponent(
-      "Hi Seth,\n\nI need help accessing the PeerLink Panel Directory.\n\nMy email address is:\n\nMy issue:\n"
-    );
-    return `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
-  }, []);
+  useEffect(() => {
+  mountedRef.current = true;
+
+  return () => {
+    mountedRef.current = false;
+  };
+}, []);
+
+ const mailto = useMemo(() => {
+  const subject = encodeURIComponent("PeerLink Directory Access Help");
+  const body = encodeURIComponent(
+    [
+      "Hi Seth,",
+      "",
+      "I need help accessing the PeerLink Panel Directory.",
+      "",
+      `My email address: ${email || ""}`,
+      `Page: ${window.location.href}`,
+      `Error shown: ${error || "None shown"}`,
+      "",
+      "Issue details:",
+      "",
+    ].join("\n")
+  );
+
+  return `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
+}, [email, error]);
 
   useEffect(() => {
   let subscription = null;
@@ -79,42 +99,42 @@ export default function LoginPage() {
   };
 }, []);
 
-  const handleMagicLink = async () => {
-    const cleanEmail = String(email || "").trim().toLowerCase();
+ const handleMagicLink = async () => {
+  const cleanEmail = String(email || "").trim().toLowerCase();
 
-    if (!cleanEmail) {
-      setError("Enter your email address.");
-      return;
-    }
+  if (!cleanEmail) {
+    setError("Enter your email address.");
+    return;
+  }
 
-    setError("");
-    setSending(true);
+  setError("");
+  setSending(true);
 
-    try {
-      const { error: authError } = await supabase.auth.signInWithOtp({
-  email: cleanEmail,
-  options: {
-    shouldCreateUser: false,
-    emailRedirectTo: "https://reviewer-directory-public.vercel.app/",
-  },
-});
+  try {
+    const { error: authError } = await supabase.auth.signInWithOtp({
+      email: cleanEmail,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
 
-      if (authError) throw authError;
+    if (authError) throw authError;
 
-      if (!mountedRef.current) return;
-      setSuccess(true);
-    } catch (e) {
-      if (!mountedRef.current) return;
-      setSuccess(false);
-      setError(
-        e?.message ||
-          "Unable to send magic link. Make sure your email has been authorized."
-      );
-    } finally {
-      if (!mountedRef.current) return;
-      setSending(false);
-    }
-  };
+    if (!mountedRef.current) return;
+    setSuccess(true);
+  } catch (e) {
+    if (!mountedRef.current) return;
+    setSuccess(false);
+    setError(
+      e?.message ||
+        "Unable to send magic link. Make sure your email has been authorized."
+    );
+  } finally {
+    if (!mountedRef.current) return;
+    setSending(false);
+  }
+};
 
   return (
     <Box
@@ -351,29 +371,54 @@ export default function LoginPage() {
                 startAdornment: <EmailRoundedIcon sx={{ mr: 1, color: "rgba(190,214,255,0.8)" }} />,
               }}
               sx={{
-                mb: 2.35,
-                "& .MuiInputLabel-root": { color: "rgba(190,214,255,0.76)" },
-                "& .MuiInputLabel-root.Mui-focused": { color: "#fff" },
-                "& .MuiInputBase-input": { color: "#fff" },
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 3.2,
-                  background: "rgba(255,255,255,0.045)",
-                  "& fieldset": {
-                    borderColor: "rgba(160,210,255,0.20)",
-                    borderWidth: "2px",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "rgba(190,228,255,0.45)",
-                  },
-                  "&.Mui-focused": {
-                    background: "rgba(122,162,255,0.07)",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "rgba(122,162,255,0.95)",
-                    boxShadow: "0 0 0 4px rgba(122,162,255,0.18)",
-                  },
-                },
-              }}
+  mb: 2.35,
+  "& .MuiInputLabel-root": { color: "rgba(190,214,255,0.76)" },
+  "& .MuiInputLabel-root.Mui-focused": { color: "#fff" },
+
+  "& .MuiInputBase-input": {
+    color: "#fff",
+  },
+
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 3.2,
+    background: "rgba(255,255,255,0.045)",
+
+    "& fieldset": {
+      borderColor: "rgba(160,210,255,0.20)",
+      borderWidth: "2px",
+    },
+    "&:hover fieldset": {
+      borderColor: "rgba(190,228,255,0.45)",
+    },
+    "&.Mui-focused": {
+      background: "rgba(122,162,255,0.07)",
+    },
+    "&.Mui-focused fieldset": {
+      borderColor: "rgba(122,162,255,0.95)",
+      boxShadow: "0 0 0 4px rgba(122,162,255,0.18)",
+    },
+
+    /* autofill fix */
+    "& input:-webkit-autofill": {
+      WebkitTextFillColor: "#fff",
+      caretColor: "#fff",
+      WebkitBoxShadow: "0 0 0 1000px transparent inset",
+      transition: "background-color 9999s ease-in-out 0s",
+    },
+
+    "& input:-webkit-autofill:hover": {
+      WebkitTextFillColor: "#fff",
+      caretColor: "#fff",
+      WebkitBoxShadow: "0 0 0 1000px transparent inset",
+    },
+
+    "& input:-webkit-autofill:focus": {
+      WebkitTextFillColor: "#fff",
+      caretColor: "#fff",
+      WebkitBoxShadow: "0 0 0 1000px transparent inset",
+    },
+  },
+}}
             />
 
             <Button
