@@ -1,5 +1,4 @@
 // src/USReviewerDirectoryDrawer.js
-// @ts-nocheck
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
@@ -84,6 +83,8 @@ const STATE_NAME_TO_CODE = {
 };
 
 function toStrArray(v) {
+    // Normalizes incoming DB values that may arrive as arrays,
+  // JSON strings, or comma-delimited strings.
   if (!v) return [];
   if (Array.isArray(v)) return v.filter(Boolean);
   try {
@@ -101,6 +102,8 @@ function toStrArray(v) {
 }
 
 function normalizeState(s) {
+    // Converts state names / abbreviations into a standard 2-letter code
+  // so filtering and map highlighting use one consistent format.
   if (!s) return "";
   const t = String(s).trim().toUpperCase();
   const nameToAbbr = {
@@ -188,7 +191,6 @@ function dnuList(r) {
   return toStrArray(r?.dnu).filter(Boolean);
 }
 
-/* ---------- colorful chip helpers ---------- */
 function hashHue(str) {
   const s = String(str || "");
   let h = 0;
@@ -223,11 +225,10 @@ function specialtyChipSx(label, dark) {
 }
 
 function tagChipSx({ kind, dark }) {
-  // kind: "wc" | "dnu"
   const base =
     kind === "wc"
-      ? { hue: 142, sat: 70, light: dark ? 56 : 50 } // green
-      : { hue: 358, sat: 72, light: dark ? 58 : 52 }; // red/pink
+      ? { hue: 142, sat: 70, light: dark ? 56 : 50 }
+      : { hue: 358, sat: 72, light: dark ? 58 : 52 };
 
   const a1 = dark ? 0.22 : 0.14;
   const a2 = dark ? 0.14 : 0.10;
@@ -262,6 +263,8 @@ export default function USReviewerDirectoryDrawer({
   const [wcOnly, setWcOnly] = useState(false);
 
   const byState = useMemo(() => {
+    // Builds a deduplicated reviewer list for each state code
+  // so the left panel can filter instantly when a map state is selected.
     const map = new Map();
     for (const r of reviewers || []) {
       const states = getReviewerStates(r);
@@ -438,7 +441,6 @@ export default function USReviewerDirectoryDrawer({
           height: "100%",
         }}
       >
-        {/* Header */}
         <Box sx={{ ...headerShell, p: 1.35 }}>
           <Box sx={coverGlow} />
           <Box sx={innerSheen} />
@@ -480,7 +482,6 @@ export default function USReviewerDirectoryDrawer({
           </Stack>
         </Box>
 
-        {/* Body */}
         <Box
           sx={{
             display: "grid",
@@ -490,7 +491,6 @@ export default function USReviewerDirectoryDrawer({
             flex: 1,
           }}
         >
-          {/* LEFT PANEL */}
           <Paper
             sx={{
               ...cardSurface,
@@ -627,7 +627,6 @@ export default function USReviewerDirectoryDrawer({
                           {nm || "Unnamed reviewer"}
                         </Typography>
 
-                        {/* Specialties (colored) */}
                         {specs?.length ? (
                           <Box sx={{ mt: 0.6, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                             {specs.slice(0, 4).map((s) => (
@@ -655,7 +654,6 @@ export default function USReviewerDirectoryDrawer({
                           </Typography>
                         )}
 
-                        {/* WC State Jurisdiction (when present) */}
                         {wcStates?.length ? (
                           <Box sx={{ mt: 0.7, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                             {wcStates.slice(0, 10).map((st) => (
@@ -678,7 +676,6 @@ export default function USReviewerDirectoryDrawer({
                           </Box>
                         ) : null}
 
-                        {/* DNU (when present) */}
                         {dnu?.length ? (
                           <Box sx={{ mt: 0.7, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                             {dnu.slice(0, 6).map((x) => (
@@ -714,7 +711,6 @@ export default function USReviewerDirectoryDrawer({
             </Box>
           </Paper>
 
-          {/* MAP PANEL */}
           <Paper
             sx={{
               ...cardSurface,
@@ -748,7 +744,6 @@ export default function USReviewerDirectoryDrawer({
               </Stack>
             </Box>
 
-            {/* MAP VIEWPORT */}
             <Box
               sx={{
                 position: "relative",
@@ -902,7 +897,6 @@ export default function USReviewerDirectoryDrawer({
               </Box>
             </Box>
 
-            {/* Stats strip (unchanged) */}
             <Box
               sx={{
                 position: "relative",

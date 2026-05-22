@@ -24,13 +24,10 @@ import {
   ViewCompactAlt as CompactIcon,
   FormatSize as FormatSizeIcon,
 } from "@mui/icons-material";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import ReviewerDirectoryPublic from "./ReviewerDirectoryPublic";
-import LoginPage from "./LoginPage";
-import AuthCallbackPage from "./AuthCallbackPage";
 
-// --------- LocalStorage helpers for UI prefs ----------
 const LS = {
   get: (k, d) => {
     try {
@@ -48,9 +45,6 @@ const LS = {
 };
 
 function AppShell() {
-  const location = useLocation();
-  const onLoginPage = location.pathname === "/login";
-
   const prefersDark =
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
@@ -166,8 +160,7 @@ function AppShell() {
     <ThemeProvider theme={theme} key={mode}>
       <CssBaseline enableColorScheme />
 
-      {!onLoginPage && (
-        <Box sx={{ position: "fixed", top: 14, right: 12, zIndex: 2000 }}>
+      <Box sx={{ position: "fixed", top: 14, right: 12, zIndex: 2000 }}>
           <Tooltip title="Menu">
             <Paper
               elevation={0}
@@ -360,13 +353,10 @@ function AppShell() {
             </MenuItem>
           </Menu>
         </Box>
-      )}
 
       <Routes>
-  <Route path="/login" element={<LoginPage />} />
-  <Route path="/auth/callback" element={<AuthCallbackPage />} />
   <Route path="/" element={<ReviewerDirectoryPublic />} />
-  <Route path="*" element={<Navigate to="/" replace />} />
+  <Route path="*" element={<ReviewerDirectoryPublic />} />
 </Routes>
     </ThemeProvider>
   );

@@ -1,24 +1,54 @@
+// src/AuthCallbackPage.js
 import React, { useEffect, useState } from "react";
 import { Box, CircularProgress, Typography } from "@mui/material";
-import { supabase } from "./supabaseClient";
+import { supabase } from "./supabaseClient.js";
 
 export default function AuthCallbackPage() {
   const [message, setMessage] = useState("Signing you in...");
 
   useEffect(() => {
-    let unsub;
+    let subscription = null;
+    let cancelled = false;
+
+    const goHome = () => {
+      window.location.replace("/");
+    };
 
     const run = async () => {
       try {
-        const {
-          data: { subscription },
-        } = supabase.auth.onAuthStateChange((event, session) => {
-          if (event === "SIGNED_IN" && session) {
-            window.location.replace("/");
+        const { data } = supabase.auth.onAuthStateChange((event, session) => {
+          if (cancelled) return;
+
+          if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session) {
+            goHome();
           }
         });
 
-        unsub = subscription;
+        subscription = data?.subscription ?? null;
+
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get("code");
+
+        if (code) {
+          setMessage("Completing secure sign-in...");
+
+          const { error: exchangeError } =
+            await supabase.auth.exchangeCodeForSession(code);
+
+          if (exchangeError) throw exchangeError;
+
+          const {
+            data: { session },
+            error: sessionError,
+          } = await supabase.auth.getSession();
+
+          if (sessionError) throw sessionError;
+
+          if (session) {
+            goHome();
+            return;
+          }
+        }
 
         const {
           data: { session },
@@ -28,30 +58,42 @@ export default function AuthCallbackPage() {
         if (error) throw error;
 
         if (session) {
-          window.location.replace("/");
+          goHome();
           return;
         }
 
-        setTimeout(async () => {
-          const {
-            data: { session: delayedSession },
-          } = await supabase.auth.getSession();
+        window.setTimeout(async () => {
+          if (cancelled) return;
 
-          if (delayedSession) {
-            window.location.replace("/");
-          } else {
-            setMessage("Sign-in could not be completed. Please request a new link.");
+          try {
+            const {
+              data: { session: delayedSession },
+              error: delayedError,
+            } = await supabase.auth.getSession();
+
+            if (delayedError) throw delayedError;
+
+            if (delayedSession) {
+              goHome();
+            } else {
+              setMessage("Sign-in could not be completed. Please request a new link.");
+            }
+          } catch (e) {
+            setMessage(e?.message || "Sign-in could not be completed.");
           }
         }, 1200);
       } catch (e) {
-        setMessage(e?.message || "Sign-in could not be completed.");
+        if (!cancelled) {
+          setMessage(e?.message || "Sign-in could not be completed.");
+        }
       }
     };
 
     run();
 
     return () => {
-      unsub?.unsubscribe?.();
+      cancelled = true;
+      subscription?.unsubscribe?.();
     };
   }, []);
 

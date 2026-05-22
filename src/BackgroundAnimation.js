@@ -1,16 +1,5 @@
 // src/BackgroundAnimation.js
 import React from "react";
-
-/**
- * Canvas background (clean, modern, no glow/pulse):
- * - Deeper dark gradient
- * - More lively motion via a gentle flow-field + higher drift
- * - Smooth cursor repulsion
- * - Light dust + vignette + tiny grain
- *
- * Props:
- *   isDark?: boolean  // defaults to true
- */
 export default function BackgroundAnimation({ isDark = true }) {
   const canvasRef = React.useRef(null);
   const rafRef = React.useRef(0);
@@ -20,7 +9,6 @@ export default function BackgroundAnimation({ isDark = true }) {
   const supportsFilterRef = React.useRef(false);
   const tRef = React.useRef(0);
 
-  // Deep, cool palettes
   const paletteDark = React.useMemo(
     () => [
       { hue: 220, sat: 65, light: 46, alpha: 0.22 },
@@ -58,13 +46,12 @@ export default function BackgroundAnimation({ isDark = true }) {
 
     supportsFilterRef.current = "filter" in ctx;
 
-    // Orbs — velocity + damping
     const pal = isDark ? paletteDark : paletteLight;
-    const ORB_COUNT = Math.round((w * h) / 44000) + 10; // a touch more population
+    const ORB_COUNT = Math.round((w * h) / 44000) + 10;
     const orbs = [];
     for (let i = 0; i < ORB_COUNT; i++) {
       const p = pal[i % pal.length];
-      const depth = rand(0.38, 1.0); // closer -> higher depth
+      const depth = rand(0.38, 1.0);
       const baseR = lerp(120, 220, Math.pow(depth, 0.85));
       orbs.push({
         x: Math.random() * w,
@@ -76,9 +63,9 @@ export default function BackgroundAnimation({ isDark = true }) {
         baseR,
         r: baseR * rand(0.98, 1.02),
         phase: Math.random() * Math.PI * 2,
-        speed: rand(0.0018, 0.0032) * (isDark ? 1.0 : 0.9), // ↑ a bit
-        driftX: rand(0.12, 0.22) * depth,                     // ↑ a bit
-        driftY: rand(0.10, 0.18) * depth,                     // ↑ a bit
+        speed: rand(0.0018, 0.0032) * (isDark ? 1.0 : 0.9),
+        driftX: rand(0.12, 0.22) * depth,
+        driftY: rand(0.10, 0.18) * depth,
         hue: p.hue,
         sat: p.sat,
         light: p.light,
@@ -88,7 +75,6 @@ export default function BackgroundAnimation({ isDark = true }) {
     }
     orbsRef.current = orbs;
 
-    // Sparse dust
     const DUST = [];
     const dustCount = Math.round((w * h) / 150000) + 10;
     for (let i = 0; i < dustCount; i++) {
@@ -111,9 +97,8 @@ export default function BackgroundAnimation({ isDark = true }) {
     const w = canvas.clientWidth || window.innerWidth;
     const h = canvas.clientHeight || window.innerHeight;
 
-    tRef.current += 0.5; // time for flow-field
+    tRef.current += 0.5;
 
-    // Deep dark background
     ctx.clearRect(0, 0, w, h);
     const g1 = ctx.createLinearGradient(0, 0, 0, h);
     if (isDark) {
@@ -126,7 +111,6 @@ export default function BackgroundAnimation({ isDark = true }) {
     ctx.fillStyle = g1;
     ctx.fillRect(0, 0, w, h);
 
-    // Subtle diagonal overlay
     const g2 = ctx.createLinearGradient(0, 0, w, h);
     g2.addColorStop(0, isDark ? "rgba(20, 26, 40, 0.18)" : "rgba(230, 236, 246, 0.12)");
     g2.addColorStop(1, "rgba(0, 0, 0, 0)");
@@ -137,45 +121,44 @@ export default function BackgroundAnimation({ isDark = true }) {
 
     const mouse = mouseRef.current;
 
-    // Orbs with gentle flow-field motion
     ctx.globalCompositeOperation = "screen";
-    const k = 0.0026;             // field spatial frequency
-    const amp = 0.08;             // field force amplitude
-    const time = tRef.current * 0.002; // slow temporal change
+    const k = 0.0026;
+    const amp = 0.08;
+    const time = tRef.current * 0.002;
 
     for (const o of orbsRef.current) {
-      // flow-field force (curl-ish from two sines)
+     
       const fx = Math.sin((o.y + time * 700) * k) * amp;
       const fy = Math.cos((o.x - time * 900) * k) * amp;
       o.ax += fx * (0.8 + o.depth * 0.6);
       o.ay += fy * (0.8 + o.depth * 0.6);
 
-      // phased drift
+  
       o.phase += o.speed;
       o.ax += Math.cos(o.phase * 0.9) * o.driftX * 0.0014 * o.depth;
       o.ay += Math.sin(o.phase * 0.7) * o.driftY * 0.0014 * o.depth;
 
-      // cursor repulsion
+    
       if (mouse.active) {
         const dx = o.x - mouse.x;
         const dy = o.y - mouse.y;
         const dist2 = dx * dx + dy * dy;
-        const reach = Math.max(240, o.r * 1.05); // a bit wider
+        const reach = Math.max(240, o.r * 1.05);
         if (dist2 < reach * reach) {
           const d = Math.sqrt(dist2) || 0.001;
           const f = easeOutCubic((reach - d) / reach);
           const ux = dx / d;
           const uy = dy / d;
-          const strength = 2.8 * o.depth;        // slightly punchier
+          const strength = 2.8 * o.depth;     
           o.ax += ux * f * strength;
           o.ay += uy * f * strength;
         }
       }
 
-      // integrate + damping + cap
-      o.vx = (o.vx + o.ax) * 0.575; // less damping → more motion
+     
+      o.vx = (o.vx + o.ax) * 0.575; 
       o.vy = (o.vy + o.ay) * 0.575;
-      const maxSpeed = lerp(0.7, 1.15, o.depth); // faster cap
+      const maxSpeed = lerp(0.7, 1.15, o.depth);
       const spd = Math.hypot(o.vx, o.vy);
       if (spd > maxSpeed) {
         const k2 = maxSpeed / (spd || 1);
@@ -187,16 +170,13 @@ export default function BackgroundAnimation({ isDark = true }) {
       o.ax = 0;
       o.ay = 0;
 
-      // radius stays steady
       o.r += (o.baseR - o.r) * 0.05;
 
-      // wrap
       if (o.x < -o.r) o.x = w + o.r;
       if (o.x > w + o.r) o.x = -o.r;
       if (o.y < -o.r) o.y = h + o.r;
       if (o.y > h + o.r) o.y = -o.r;
 
-      // gradient orb
       const innerX = o.x - o.r * 0.35;
       const innerY = o.y - o.r * 0.35;
       const rg = ctx.createRadialGradient(innerX, innerY, o.r * 0.06, o.x, o.y, o.r);
@@ -220,7 +200,6 @@ export default function BackgroundAnimation({ isDark = true }) {
     }
     ctx.globalCompositeOperation = "source-over";
 
-    // Dust
     ctx.fillStyle = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)";
     for (const d of dustRef.current) {
       d.x += d.vx;
@@ -236,7 +215,6 @@ export default function BackgroundAnimation({ isDark = true }) {
     }
     ctx.globalAlpha = 1;
 
-    // Grain
     grain(ctx, w, h, isDark ? 0.02 : 0.016);
   }, [isDark]);
 
@@ -290,7 +268,6 @@ export default function BackgroundAnimation({ isDark = true }) {
   );
 }
 
-/* ---------- helpers ---------- */
 function rand(min, max) {
   return Math.random() * (max - min) + min;
 }

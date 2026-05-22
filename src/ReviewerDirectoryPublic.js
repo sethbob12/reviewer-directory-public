@@ -215,9 +215,9 @@ export default function ReviewerDirectoryPublic() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [status, setStatus] = useState({ label: "Unknown", color: "default", uptime: null });
 
-  
-const [authed, setAuthed] = useState(false);
-const [authReady, setAuthReady] = useState(false);
+  // Public iframe mode: the portal controls access. This app reads and edits notes via Supabase anon policies.
+  const authed = true;
+  const authReady = true;
 
   const [mapOpen, setMapOpen] = useState(false);
 
@@ -286,52 +286,7 @@ const [authReady, setAuthReady] = useState(false);
   },
 };
 
-  const handleSignOut = async () => {
-  await supabase.auth.signOut();
-  window.location.replace("/login");
-};
-
-useEffect(() => {
-  let subscription = null;
-  let booted = false;
-
-  const boot = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    setAuthed(!!session);
-    setAuthReady(true);
-    booted = true;
-  };
-
-  boot();
-
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-    setAuthed(!!session);
-
-    if (booted) {
-      setAuthReady(true);
-    }
-  });
-
-  subscription = data?.subscription ?? null;
-
-  return () => {
-    subscription?.unsubscribe?.();
-  };
-}, []);
-
-useEffect(() => {
-  if (!authReady) return;
-  if (authed) return;
-
-  if (window.location.pathname !== "/login") {
-    window.location.replace("/login");
-  }
-}, [authReady, authed]);
-
-const tablePaper = {
+  const tablePaper = {
   flex: 1,
   minHeight: 0,
   display: "flex",
@@ -945,21 +900,7 @@ const tablePaper = {
               </Box>
             </Tooltip>
           )}
-          <Button
-  size="small"
-  variant="outlined"
-  onClick={handleSignOut}
-  sx={{
-    borderRadius: 999,
-    fontWeight: 900,
-    color: "#fff",
-    border: `1px solid ${alpha("#7aa2ff", 0.45)}`,
-    background: alpha("#0b0e19", 0.22),
-    "&:hover": { background: alpha("#7aa2ff", 0.10) },
-  }}
->
-  Sign out
-</Button>
+
         </Box>
       </Box>
 
@@ -1089,7 +1030,6 @@ const tablePaper = {
       )}
 
       <Paper sx={tablePaper}>
-        {/* Filter pills summary */}
         <Box
           sx={{
             px: 2,
@@ -1251,7 +1191,7 @@ const tablePaper = {
         const saving = !!notesSaving[r.id];
         const nerr = notesError[r.id];
         const isEditing = notesEditing === r.id;
-        const canEditNotes = authed && r.id != null;
+        const canEditNotes = r.id != null;
 
         const stripeBg = idx % 2 === 0 ? rowStripeBg : "transparent";
 
@@ -1491,7 +1431,7 @@ const tablePaper = {
                     color: PLACEHOLDER,
                   }}
                 >
-                  {canEditNotes ? "click to add notes" : "login to edit notes"}
+                  "No notes"
                 </Typography>
               )}
 

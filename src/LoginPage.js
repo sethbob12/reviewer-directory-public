@@ -21,10 +21,8 @@ import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import BackgroundAnimation from "./BackgroundAnimation.js";
 import { supabase } from "./supabaseClient.js";
 
-/* ---------- config ---------- */
 const SUPPORT_EMAIL = process.env.REACT_APP_SUPPORT_EMAIL || "seth@peerlinkmedical.com";
 
-/* ---------- motion ---------- */
 const containerVariants = {
   initial: { opacity: 0, y: 22, scale: 0.988 },
   animate: {
@@ -398,7 +396,6 @@ export default function LoginPage() {
       boxShadow: "0 0 0 4px rgba(122,162,255,0.18)",
     },
 
-    /* autofill fix */
     "& input:-webkit-autofill": {
       WebkitTextFillColor: "#fff",
       caretColor: "#fff",

@@ -1,70 +1,137 @@
-# Getting Started with Create React App
+# PeerLink Reviewer Directory Public
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A lightweight, authenticated reviewer directory for authorized Emperion and PeerLink staff to identify reviewer coverage by specialty, jurisdiction, and availability.
 
-## Available Scripts
+## Purpose
 
-In the project directory, you can run:
+This project was built to provide a simple operational reference tool for scheduling and reviewer selection workflows.
 
-### `npm start`
+The application allows approved users to quickly identify:
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- reviewer specialty
+- state licensure / jurisdiction coverage
+- availability status
+- internal do-not-use indicators
+- limited operational notes
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+This tool is intentionally narrow in scope and designed to expose only a minimal operational dataset.
 
-### `npm test`
+## Scope
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+This application is intentionally small and isolated:
 
-### `npm run build`
+- single-page React application
+- separate Supabase project and PostgreSQL database
+- authenticated access required
+- no connection to Peer Exchange (PXC) production systems
+- no client system integration
+- no public self-registration
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Data Stored
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+The database stores operational reference data only.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Fields include:
 
-### `npm run eject`
+- reviewer name
+- specialty
+- state licensure / WC jurisdictions
+- availability indicators (unavailable are hidden)
+- internal DNU flags
+- optional operational notes
+- timestamps / sync metadata
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Data Explicitly Not Stored
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+This application does not store:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+- PHI
+- medical records
+- claimant data
+- client data
+- financial data
+- reviewer contact information
+- credentials used for internal production systems
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Architecture
 
-## Learn More
+### Frontend
+- React
+- Material UI
+- JavaScript
+- Hosted on Vercel
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Backend
+- Supabase
+- PostgreSQL database
+- Supabase Auth for passwordless login
+- Supabase Edge Functions for scheduled synchronization
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Authentication Model
 
-### Code Splitting
+Authentication is handled through Supabase magic-link email authentication.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Access model
+Users cannot self-register.
 
-### Analyzing the Bundle Size
+Access requires:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+1. user email is manually added to Supabase Auth
+2. user requests a magic login link from the login page
+3. Supabase sends a one-time sign-in link to the approved email
+4. successful authentication creates a session and allows access to the application
 
-### Making a Progressive Web App
+This creates a whitelisted access model.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### Notes
+- `shouldCreateUser: false` is used when requesting magic links
+- only pre-provisioned email accounts may authenticate
+- anonymous access is blocked
 
-### Advanced Configuration
+## Authorization and Database Security
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+Row Level Security (RLS) is enabled on the primary directory table.
 
-### Deployment
+Current policy model:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+- `SELECT`: authenticated users only
+- `UPDATE`: authenticated users only (used only for limited operational note updates)
+- anonymous access: blocked
 
-### `npm run build` fails to minify
+This ensures the frontend only reads and updates data through authenticated sessions.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Data Synchronization
+
+The public directory database is updated through a scheduled Supabase Edge Function.
+
+### Sync behavior
+- runs on a scheduled interval
+- refreshes the public directory table using a limited operational dataset
+- synchronization is one-directional
+- only the approved operational reference fields are replicated
+
+## Database Schema Overview
+
+The application is centered on a single operational directory table.
+
+Columns include:
+
+- `id`
+- `reviewer_name`
+- `specialty`
+- `states`
+- `availability_status`
+- `dnu_flag`
+- `notes`
+- `updated_at`
+
+## Environment Variables
+
+Create a `.env` file using the variables listed in `.env.example`.
+
+Required variables:
+
+- REACT_APP_SUPABASE_URL
+- REACT_APP_SUPABASE_ANON_KEY
+- REACT_APP_SUPPORT_EMAIL
+- REACT_APP_STATUS_URL (optional)
