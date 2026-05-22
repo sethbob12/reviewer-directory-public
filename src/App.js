@@ -24,7 +24,7 @@ import {
   ViewCompactAlt as CompactIcon,
   FormatSize as FormatSizeIcon,
 } from "@mui/icons-material";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 
 import ReviewerDirectoryPublic from "./ReviewerDirectoryPublic";
 
@@ -45,6 +45,21 @@ const LS = {
 };
 
 function AppShell() {
+  const location = useLocation();
+
+  const isEmbeddedByWindow = (() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true;
+    }
+  })();
+
+  const isEmbedMode =
+    isEmbeddedByWindow ||
+    new URLSearchParams(location.search || "").get("embed") === "1";
+
   const prefersDark =
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
@@ -80,16 +95,18 @@ function AppShell() {
     sendEvent("pl:set-font-scale", { fontScale: scale });
   };
 
+  const effectiveDensity = isEmbedMode ? "compact" : density;
+  const effectiveFontScale = isEmbedMode ? "sm" : fontScale;
+
   useEffect(() => {
-    sendEvent("pl:set-density", { density });
-    sendEvent("pl:set-font-scale", { fontScale });
+    sendEvent("pl:set-density", { density: effectiveDensity });
+    sendEvent("pl:set-font-scale", { fontScale: effectiveFontScale });
     sendEvent("pl:set-theme", { mode });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [effectiveDensity, effectiveFontScale, mode]);
 
   const theme = useMemo(() => {
     const isDark = mode === "dark";
-    const baseFont = fontScale === "sm" ? 13 : fontScale === "lg" ? 16 : 14;
+    const baseFont = effectiveFontScale === "sm" ? 13 : effectiveFontScale === "lg" ? 16 : 14;
 
     const lightGray = {
       bgDefault: "#c9ced6",
@@ -151,7 +168,7 @@ function AppShell() {
           `'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"`,
       },
     });
-  }, [mode, fontScale]);
+  }, [mode, effectiveFontScale]);
 
   const handleOpenMenu = (e) => setMenuAnchor(menuOpen ? null : e.currentTarget);
   const handleCloseMenu = () => setMenuAnchor(null);
@@ -160,6 +177,7 @@ function AppShell() {
     <ThemeProvider theme={theme} key={mode}>
       <CssBaseline enableColorScheme />
 
+      {!isEmbedMode && (
       <Box sx={{ position: "fixed", top: 14, right: 12, zIndex: 2000 }}>
           <Tooltip title="Menu">
             <Paper
@@ -353,11 +371,12 @@ function AppShell() {
             </MenuItem>
           </Menu>
         </Box>
+      )}
 
       <Routes>
-  <Route path="/" element={<ReviewerDirectoryPublic />} />
-  <Route path="*" element={<ReviewerDirectoryPublic />} />
-</Routes>
+        <Route path="/" element={<ReviewerDirectoryPublic embedMode={isEmbedMode} />} />
+        <Route path="*" element={<ReviewerDirectoryPublic embedMode={isEmbedMode} />} />
+      </Routes>
     </ThemeProvider>
   );
 }

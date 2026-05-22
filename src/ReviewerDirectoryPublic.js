@@ -194,10 +194,15 @@ function uniq(arr) {
   return Array.from(new Set((arr || []).filter(Boolean)));
 }
 
-export default function ReviewerDirectoryPublic() {
+export default function ReviewerDirectoryPublic({ embedMode = false } = {}) {
   
-  const [density, setDensity] = useState("comfortable");
+  const isEmbedMode = Boolean(embedMode);
+  const [density, setDensity] = useState(isEmbedMode ? "compact" : "comfortable");
   const [highContrast, setHighContrast] = useState(false);
+
+  useEffect(() => {
+    if (isEmbedMode) setDensity("compact");
+  }, [isEmbedMode]);
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -257,8 +262,8 @@ export default function ReviewerDirectoryPublic() {
   const cellBorder = `${outlineThick}px solid ${alpha("#ffffff", highContrast ? 0.24 : 0.12)}`;
 
   const glassPaper = {
-  p: 2,
-  borderRadius: 3,
+  p: isEmbedMode ? 1.15 : 2,
+  borderRadius: isEmbedMode ? 2.25 : 3,
   color: TXT_PRIMARY,
   position: "relative",
   background: "linear-gradient(180deg, rgba(17,23,39,0.55), rgba(17,23,39,0.35))",
@@ -292,7 +297,7 @@ export default function ReviewerDirectoryPublic() {
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
-  borderRadius: 3,
+  borderRadius: isEmbedMode ? 2.25 : 3,
   color: TXT_PRIMARY,
 
   position: "relative", // needed for :before
@@ -757,19 +762,22 @@ export default function ReviewerDirectoryPublic() {
   return (
     <Box
   sx={{
-    height: "100vh",
+    height: "100dvh",
+    minHeight: 0,
     overflow: "hidden",
     display: "flex",
     flexDirection: "column",
-    gap: 2,
-    px: { xs: 1, md: 4 },
-    py: { xs: 1.5, md: 4 },
-    background: pageBg,
+    gap: isEmbedMode ? 1.05 : 2,
+    px: isEmbedMode ? { xs: 0.75, md: 1.25 } : { xs: 1, md: 4 },
+    py: isEmbedMode ? { xs: 0.75, md: 1.1 } : { xs: 1.5, md: 4 },
+    background: isEmbedMode
+      ? "linear-gradient(180deg, #090d18 0%, #0b1020 52%, #090d18 100%)"
+      : pageBg,
     color: TXT_PRIMARY,
     "& .MuiTypography-root": { color: "inherit" },
   }}
 >
-      <USReviewerDirectoryDrawer open={mapOpen} onClose={() => setMapOpen(false)} reviewers={sorted} onOpenReviewerDetails={null} />
+      <USReviewerDirectoryDrawer open={mapOpen} onClose={() => setMapOpen(false)} reviewers={sorted} onOpenReviewerDetails={null} embedMode={isEmbedMode} />
 
       <Snackbar
         open={refreshSnack && !err}
@@ -805,20 +813,20 @@ export default function ReviewerDirectoryPublic() {
       <Box
         sx={{
           display: "flex",
-          alignItems: "center",
+          alignItems: { xs: "flex-start", md: "center" },
           justifyContent: "space-between",
           width: "100%",
           flexShrink: 0,
-          flexWrap: "nowrap",
-          gap: 2,
-          pr: 6,
+          flexWrap: { xs: "wrap", md: "nowrap" },
+          gap: isEmbedMode ? 0.85 : 2,
+          pr: isEmbedMode ? 0 : 6,
         }}
       >
-        <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: 0.2, minWidth: 0, whiteSpace: "nowrap", color: "#fff" }}>
+        <Typography variant={isEmbedMode ? "h6" : "h4"} sx={{ fontWeight: 900, letterSpacing: 0.2, minWidth: 0, whiteSpace: "nowrap", color: "#fff", fontSize: isEmbedMode ? { xs: "1.02rem", md: "1.24rem" } : undefined }}>
           PeerLink Panel Directory
         </Typography>
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "nowrap" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: isEmbedMode ? 0.75 : 1.25, flexWrap: "nowrap", ml: "auto" }}>
           <Tooltip title="Open Coverage Map">
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
               <IconButton
@@ -857,7 +865,7 @@ export default function ReviewerDirectoryPublic() {
               </IconButton>
 
               <Box sx={{ lineHeight: 1 }}>
-                <Typography variant="caption" sx={{ fontWeight: 950, color: alpha("#ffffff", 0.92), whiteSpace: "nowrap" }}>
+                <Typography variant="caption" sx={{ fontWeight: 950, color: alpha("#ffffff", 0.92), whiteSpace: "nowrap", display: isEmbedMode ? { xs: "none", sm: "block" } : "block" }}>
                   Coverage Map
                 </Typography>
               </Box>
@@ -869,6 +877,7 @@ export default function ReviewerDirectoryPublic() {
             icon={<LiveDot sx={{ fontSize: 10, color: "#22c55e" }} />}
             label="Live"
             sx={{
+              display: isEmbedMode ? { xs: "none", sm: "inline-flex" } : "inline-flex",
               height: 22,
               "& .MuiChip-icon": { mr: 0.3 },
               background: alpha("#22c55e", 0.12),
@@ -878,7 +887,7 @@ export default function ReviewerDirectoryPublic() {
             }}
           />
 
-          <Typography variant="caption" sx={{ whiteSpace: "nowrap", color: TXT_SECONDARY }}>
+          <Typography variant="caption" sx={{ whiteSpace: "nowrap", color: TXT_SECONDARY, display: isEmbedMode ? { xs: "none", md: "inline" } : "inline" }}>
             {lastUpdated ? `Updated · ${formatLocalTime(lastUpdated)}` : "Connecting…"}
           </Typography>
 
@@ -905,7 +914,7 @@ export default function ReviewerDirectoryPublic() {
       </Box>
 
       <Paper sx={{ ...glassPaper, flexShrink: 0 }}>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: isEmbedMode ? 1 : 2, alignItems: "center" }}>
           <Autocomplete
             multiple
             options={allSpecialties}
@@ -919,7 +928,7 @@ export default function ReviewerDirectoryPublic() {
                 
               />
             )}
-            sx={{ minWidth: 260, ...darkFieldSX }}
+            sx={{ minWidth: isEmbedMode ? 210 : 260, flex: isEmbedMode ? "1 1 220px" : undefined, ...darkFieldSX }}
           />
           <Autocomplete
             multiple
@@ -927,7 +936,7 @@ export default function ReviewerDirectoryPublic() {
             value={selStates}
             onChange={(_, v) => setSelStates(v)}
             renderInput={(p) => <TextField {...p} label="State" />}
-            sx={{ minWidth: 240, ...darkFieldSX }}
+            sx={{ minWidth: isEmbedMode ? 170 : 240, flex: isEmbedMode ? "1 1 180px" : undefined, ...darkFieldSX }}
           />
 
           <Tooltip title="Search matches name, specialties, states, DNU, WC states, and notes">
@@ -935,7 +944,7 @@ export default function ReviewerDirectoryPublic() {
               label="Search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              sx={{ minWidth: 260, flex: 1, maxWidth: 560, ...darkFieldSX }}
+              sx={{ minWidth: isEmbedMode ? 210 : 260, flex: 1, maxWidth: isEmbedMode ? 460 : 560, ...darkFieldSX }}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -1032,8 +1041,8 @@ export default function ReviewerDirectoryPublic() {
       <Paper sx={tablePaper}>
         <Box
           sx={{
-            px: 2,
-            py: 1.25,
+            px: isEmbedMode ? 1.25 : 2,
+            py: isEmbedMode ? 0.85 : 1.25,
             borderBottom: `1px solid ${alpha("#ffffff", 0.10)}`,
             display: "flex",
             alignItems: "center",

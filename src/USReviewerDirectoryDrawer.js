@@ -254,9 +254,12 @@ export default function USReviewerDirectoryDrawer({
   onClose,
   reviewers = [],
   onOpenReviewerDetails,
+  embedMode = false,
 }) {
   const theme = useTheme();
   const dark = theme.palette.mode === "dark";
+  const isEmbedMode = Boolean(embedMode);
+  const mapSectionHeight = isEmbedMode ? "calc(100dvh - 82px)" : MAP_SECTION_H;
 
   const [activeState, setActiveState] = useState("ALL");
   const [query, setQuery] = useState("");
@@ -422,7 +425,7 @@ export default function USReviewerDirectoryDrawer({
       onClose={onClose}
       PaperProps={{
         sx: {
-          width: { xs: "100%", md: "min(1480px, 100%)" },
+          width: isEmbedMode ? "100%" : { xs: "100%", md: "min(1480px, 100%)" },
           border: "none",
           background: "transparent",
           height: "100dvh",
@@ -433,15 +436,15 @@ export default function USReviewerDirectoryDrawer({
     >
       <Box
         sx={{
-          p: { xs: 1, sm: 1.25 },
+          p: isEmbedMode ? { xs: 0.75, sm: 1 } : { xs: 1, sm: 1.25 },
           display: "flex",
           flexDirection: "column",
-          gap: 1,
+          gap: isEmbedMode ? 0.75 : 1,
           minHeight: 0,
           height: "100%",
         }}
       >
-        <Box sx={{ ...headerShell, p: 1.35 }}>
+        <Box sx={{ ...headerShell, p: isEmbedMode ? 1 : 1.35 }}>
           <Box sx={coverGlow} />
           <Box sx={innerSheen} />
 
@@ -485,8 +488,8 @@ export default function USReviewerDirectoryDrawer({
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "520px 1fr" },
-            gap: 1,
+            gridTemplateColumns: isEmbedMode ? { xs: "1fr", md: "460px 1fr" } : { xs: "1fr", md: "520px 1fr" },
+            gap: isEmbedMode ? 0.75 : 1,
             minHeight: 0,
             flex: 1,
           }}
@@ -494,7 +497,7 @@ export default function USReviewerDirectoryDrawer({
           <Paper
             sx={{
               ...cardSurface,
-              height: { xs: "auto", md: MAP_SECTION_H },
+              height: { xs: "auto", md: mapSectionHeight },
               minHeight: 0,
               display: "flex",
               flexDirection: "column",
@@ -505,7 +508,7 @@ export default function USReviewerDirectoryDrawer({
             <Box
               sx={{
                 position: "relative",
-                p: 1.15,
+                p: isEmbedMode ? 0.9 : 1.15,
                 borderBottom: `1px solid ${alpha(dark ? "#fff" : "#000", dark ? 0.10 : 0.08)}`,
               }}
             >
@@ -582,7 +585,7 @@ export default function USReviewerDirectoryDrawer({
 
             <Divider sx={{ opacity: 0.35 }} />
 
-            <Box sx={{ position: "relative", minHeight: 0, flex: 1, overflowY: "auto", p: 1.15 }}>
+            <Box sx={{ position: "relative", minHeight: 0, flex: 1, overflowY: "auto", p: isEmbedMode ? 0.85 : 1.15 }}>
               <Stack spacing={0.8}>
                 {leftList.map((r) => {
                   const nm = nameLine(r);
@@ -714,7 +717,7 @@ export default function USReviewerDirectoryDrawer({
           <Paper
             sx={{
               ...cardSurface,
-              height: { xs: "auto", md: MAP_SECTION_H },
+              height: { xs: "auto", md: mapSectionHeight },
               minHeight: 0,
               display: "flex",
               flexDirection: "column",
@@ -723,7 +726,7 @@ export default function USReviewerDirectoryDrawer({
           >
             <Box sx={innerSheen} />
 
-            <Box sx={{ position: "relative", p: 1.15, pb: 0.9 }}>
+            <Box sx={{ position: "relative", p: isEmbedMode ? 0.85 : 1.15, pb: isEmbedMode ? 0.65 : 0.9 }}>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography variant="overline" sx={{ opacity: 0.85 }}>
                   Map
@@ -749,8 +752,8 @@ export default function USReviewerDirectoryDrawer({
                 position: "relative",
                 flex: 1,
                 minHeight: 0,
-                px: { xs: 1, md: 1.35 },
-                pb: 1.15,
+                px: isEmbedMode ? { xs: 0.75, md: 1 } : { xs: 1, md: 1.35 },
+                pb: isEmbedMode ? 0.85 : 1.15,
                 overflow: "visible",
               }}
             >
@@ -900,8 +903,8 @@ export default function USReviewerDirectoryDrawer({
             <Box
               sx={{
                 position: "relative",
-                px: 1.15,
-                py: 1.0,
+                px: isEmbedMode ? 0.9 : 1.15,
+                py: isEmbedMode ? 0.75 : 1.0,
                 borderTop: `1px solid ${alpha(dark ? "#fff" : "#000", dark ? 0.10 : 0.08)}`,
                 background: dark ? alpha("#0b1220", 0.10) : alpha("#ffffff", 0.20),
                 backdropFilter: "blur(24px) saturate(160%)",
